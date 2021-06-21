@@ -1,0 +1,13 @@
+{
+    admin off
+    debug
+    auto_https off
+    order coraza_waf first
+}
+
+http://127.0.0.1:50000 {
+	coraza_waf {
+		directives /mnt/d/goprojects/src/github.com/jptosso/coraza-caddy/test/rules.conf
+	}
+	reverse_proxy https://jptosso.github.io/coraza-waf/
+}
