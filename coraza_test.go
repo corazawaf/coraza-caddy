@@ -8,13 +8,9 @@ import (
 	"time"
 )
 
-func TestSetVars(t *testing.T){
-	caddytest.Default.AdminPort = 50002
-}
-
 func TestPlugin(t *testing.T) {
 	tester := caddytest.NewTester(t)
-	baseURL := "https://127.0.0.1:50000"
+	baseURL := "http://127.0.0.1:8080"
 	configFile := "test/caddyfile"
 	configContent, err := ioutil.ReadFile(configFile)
 	if err != nil {
@@ -22,14 +18,14 @@ func TestPlugin(t *testing.T) {
 	}
 	rawConfig := string(configContent)
 	tester.InitServer(rawConfig, "caddyfile")
-	tester.AssertGetResponse(baseURL+"/", 200, "1.0.0")
+	tester.AssertGetResponse(baseURL+"/test", 200, "test123")
 
 	time.Sleep(1 * time.Second)
 }
 
 func TestPluginReload(t *testing.T) {
 	tester := caddytest.NewTester(t)
-	baseURL := "https://127.0.0.1:50000"
+	baseURL := "http://127.0.0.1:8080"
 	configFile := "test/caddyfile"
 	configContent, err := ioutil.ReadFile(configFile)
 	if err != nil {
@@ -37,10 +33,10 @@ func TestPluginReload(t *testing.T) {
 	}
 	rawConfig := string(configContent)
 
-	rawConfig = strings.ReplaceAll(rawConfig, "https://jptosso.github.io/coraza-waf/", "https://jptosso.github.io/coraza-waf/404")
+	rawConfig = strings.ReplaceAll(rawConfig, "test123", "test456")
 
 	tester.InitServer(rawConfig, "caddyfile")
-	tester.AssertGetResponse(baseURL+"/", 200, "1.0.0")
+	tester.AssertGetResponse(baseURL+"/test", 200, "test456")
 
 	time.Sleep(1 * time.Second)
 }

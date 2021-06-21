@@ -21,7 +21,8 @@ func init() {
 }
 
 type Middleware struct {
-	Directives        string `json:"directives"`
+	DirectivesFile        string `json:"directives_file"`
+	Directives string `json:"directives"`
 	TemplateForbidden string `json:"template_forbidden"`
 
 	//for cache
@@ -51,7 +52,11 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger(m)
 	m.waf = engine.NewWaf()
 	pp, _ := seclang.NewParser(m.waf)
-	err = pp.FromFile(m.Directives)
+	if m.DirectivesFile != "" {
+		err = pp.FromFile(m.DirectivesFile)
+	}else{
+		err = pp.FromString(m.Directives)
+	}
 	if err != nil {
 		return fmt.Errorf("cannot load waf directives %w", err)
 	}
@@ -110,8 +115,10 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			return d.ArgErr()
 		}
 		switch key {
+		case "directives_file":
+			m.DirectivesFile = value
 		case "directives":
-			m.Directives = value
+			m.Directives = value			
 		case "template_forbidden":
 			m.TemplateForbidden = value
 		default:
