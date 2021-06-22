@@ -1,11 +1,9 @@
 package coraza
 
 import (
-	"bytes"
 	"fmt"
 	"net/http"
-	"sync"
-
+	"io"
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
@@ -70,6 +68,7 @@ func (m *Middleware) Validate() error {
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+	var err error
 	tx := m.waf.NewTransaction()
 	defer tx.ProcessLogging()
 	m.logger.Debug(fmt.Sprintf("[coraza] Executing transaction %s", tx.Id))
@@ -82,44 +81,28 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		m.ErrorPage(w)
 		return nil
 	}
-	respBuf := bufPool.Get().(*bytes.Buffer)
-	respBuf.Reset()
-	defer bufPool.Put(respBuf)
-	// set up the response recorder
-	shouldBuf := func(c int, h http.Header) bool {
-		// According to the documentation, this function will be run
-		// just before buffering the response body
-		for k, vr := range h {
-			for _, v := range vr {
-				tx.AddResponseHeader(k, v)
-			}
-		}
-		// We will force http/1.1
-		if tx.ProcessResponseHeaders(c, "http/1.1") != nil {
-			m.ErrorPage(w)
-			return false
-		} else {
-			// We will manually validate if recording is needed
-			// TODO sync.pool must be overwritten and optimized to allow this
-			return false
-		}
-	}
-	rec := caddyhttp.NewResponseRecorder(w, respBuf, shouldBuf)
-	// We must catch the interruption from shouldBuf
-	if tx.Interruption != nil {
-		return nil
-	}
 
+	rec := NewStreamRecorder(w, tx)
 	err = next.ServeHTTP(rec, r)
 	if err != nil {
 		return err
 	}
-	//tx.ProcessResponseBody(nil)
+	// If the response was interrupted during phase 3 or 4 we can stop the response
+	if tx.Interruption != nil {
+		m.ErrorPage(w)
+		return nil
+	}
+	if !rec.Buffered() {
+		//Nothing to do, response was already sent to the client
+		return nil
+	}
+
 	if status := rec.Status(); status > 0 {
 		w.WriteHeader(status)
 	}
-	w.Write(rec.Buffer().Bytes())
-	return nil
+	// We will send the response provided by Coraza
+	_, err = io.Copy(w, rec.Reader())
+	return err
 }
 
 // Unmarshal Caddyfile implements caddyfile.Unmarshaler.
@@ -153,12 +136,6 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	var m Middleware
 	err := m.UnmarshalCaddyfile(h.Dispenser)
 	return m, err
-}
-
-var bufPool = sync.Pool{
-	New: func() interface{} {
-		return new(bytes.Buffer)
-	},
 }
 
 // Interface guards
