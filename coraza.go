@@ -21,8 +21,8 @@ func init() {
 }
 
 type Middleware struct {
-	DirectivesFile        string `json:"directives_file"`
-	Directives string `json:"directives"`
+	DirectivesFile    string `json:"directives_file"`
+	Directives        string `json:"directives"`
 	TemplateForbidden string `json:"template_forbidden"`
 
 	//for cache
@@ -32,7 +32,7 @@ type Middleware struct {
 	waf    *engine.Waf
 }
 
-func (m *Middleware) errorPage(w http.ResponseWriter) {
+func (m *Middleware) ErrorPage(w http.ResponseWriter) {
 	w.WriteHeader(500)
 	w.Write(m.templateForbiddenContent)
 	m.logger.Debug("Transaction disrupted")
@@ -54,7 +54,7 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	pp, _ := seclang.NewParser(m.waf)
 	if m.DirectivesFile != "" {
 		err = pp.FromFile(m.DirectivesFile)
-	}else{
+	} else {
 		err = pp.FromString(m.Directives)
 	}
 	if err != nil {
@@ -79,22 +79,42 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	}
 	if it != nil {
 		//disrupted
-		m.errorPage(w)
+		m.ErrorPage(w)
 		return nil
 	}
 	respBuf := bufPool.Get().(*bytes.Buffer)
 	respBuf.Reset()
 	defer bufPool.Put(respBuf)
 	// set up the response recorder
-	shouldBuf := func(_ int, _ http.Header) bool { return true }
+	shouldBuf := func(c int, h http.Header) bool {
+		// According to the documentation, this function will be run
+		// just before buffering the response body
+		for k, vr := range h {
+			for _, v := range vr {
+				tx.AddResponseHeader(k, v)
+			}
+		}
+		// We will force http/1.1
+		if tx.ProcessResponseHeaders(c, "http/1.1") != nil {
+			m.ErrorPage(w)
+			return false
+		} else {
+			// We will manually validate if recording is needed
+			// TODO sync.pool must be overwritten and optimized to allow this
+			return false
+		}
+	}
 	rec := caddyhttp.NewResponseRecorder(w, respBuf, shouldBuf)
+	// We must catch the interruption from shouldBuf
+	if tx.Interruption != nil {
+		return nil
+	}
 
 	err = next.ServeHTTP(rec, r)
 	if err != nil {
 		return err
 	}
-	tx.ProcessResponseHeaders(rec.Status(), "?")
-	tx.ProcessResponseBody(nil)
+	//tx.ProcessResponseBody(nil)
 	if status := rec.Status(); status > 0 {
 		w.WriteHeader(status)
 	}
@@ -118,7 +138,7 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		case "directives_file":
 			m.DirectivesFile = value
 		case "directives":
-			m.Directives = value			
+			m.Directives = value
 		case "template_forbidden":
 			m.TemplateForbidden = value
 		default:

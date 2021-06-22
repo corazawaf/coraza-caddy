@@ -3,10 +3,10 @@ package coraza
 import (
 	"github.com/caddyserver/caddy/v2/caddytest"
 	"io/ioutil"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
-	"net/http"
 )
 
 func TestPlugin(t *testing.T) {
