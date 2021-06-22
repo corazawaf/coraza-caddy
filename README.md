@@ -1,6 +1,6 @@
 # Coraza WAF Caddy Module
 
-<a href="https://github.com/jptosso/coraza-caddy/actions/" target="_blank"><img src="https://github.com/jptosso/coraza-caddy/workflows/build/badge.svg?branch=main"></a>
+<a href="https://github.com/jptosso/coraza-caddy/actions/" target="_blank"><img src="https://github.com/jptosso/coraza-caddy/workflows/regression/badge.svg?branch=main"></a>
 <a href="https://pkg.go.dev/github.com/jptosso/coraza-caddy" target="_blank"><img src="https://img.shields.io/badge/godoc-reference-blue.svg"></a>
 [![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 
