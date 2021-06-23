@@ -19,7 +19,7 @@ func init() {
 }
 
 type Middleware struct {
-	DirectivesFile    string `json:"directives_file"`
+	Include    string `json:"include"`
 	Directives        string `json:"directives"`
 	TemplateForbidden string `json:"template_forbidden"`
 
@@ -50,8 +50,8 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger(m)
 	m.waf = engine.NewWaf()
 	pp, _ := seclang.NewParser(m.waf)
-	if m.DirectivesFile != "" {
-		err = pp.FromFile(m.DirectivesFile)
+	if m.Include != "" {
+		err = pp.FromFile(m.Include)
 	} else {
 		err = pp.FromString(m.Directives)
 	}
@@ -118,8 +118,8 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			return d.ArgErr()
 		}
 		switch key {
-		case "directives_file":
-			m.DirectivesFile = value
+		case "include":
+			m.Include = value
 		case "directives":
 			m.Directives = value
 		case "template_forbidden":
