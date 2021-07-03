@@ -19,8 +19,6 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: ${{ matrix.go-version }}
-    - name: Checkout code
-      uses: actions/checkout@v2
     - name: Checkout libinjection
       uses: actions/checkout@v2
       with:
@@ -36,6 +34,8 @@ jobs:
         sudo cp src/*.h /usr/local/include/
         sudo chmod 444 /usr/local/include/libinjection*
         sudo ldconfig
+    - name: Checkout code
+      uses: actions/checkout@v2
     - name: Download vendored dependencies
       run: go mod vendor
     - name: Tests and coverage
