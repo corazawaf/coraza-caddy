@@ -36,8 +36,8 @@ jobs:
         sudo ldconfig
     - name: Checkout code
       uses: actions/checkout@v2
-    - name: Download vendored dependencies
-      run: go mod vendor
+    #- name: Download vendored dependencies
+    #  run: go mod vendor
     - name: Tests and coverage
       run: CGO_ENABLED=1 go test -v -coverprofile=coverage.out ./...
     - name: Get xcaddy
