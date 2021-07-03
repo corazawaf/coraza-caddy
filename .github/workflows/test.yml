@@ -36,16 +36,25 @@ jobs:
         sudo ldconfig
     - name: Checkout code
       uses: actions/checkout@v2
-    #- name: Download vendored dependencies
-    #  run: go mod vendor
     - name: Tests and coverage
       run: CGO_ENABLED=1 go test -v -coverprofile=coverage.out ./...
-    - name: Get xcaddy
-      run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
-    - name: Build
-      run: CGO_ENABLED=1 xcaddy build --with github.com/jptosso/coraza-caddy   
     - name: SonarCloud Scan
       uses: sonarsource/sonarcloud-github-action@master
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}      
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  build:
+    strategy:
+      matrix:
+        go-version: [1.16.x]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version }}        
+    - name: Get xcaddy
+      run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+    - name: Build
+      run: CGO_ENABLED=1 xcaddy build --with github.com/jptosso/coraza-caddy   
