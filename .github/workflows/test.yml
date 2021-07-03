@@ -21,10 +21,11 @@ jobs:
         go-version: ${{ matrix.go-version }}
     - name: Checkout code
       uses: actions/checkout@v2
-    - name: Checkout and install libinjection
+    - name: Checkout libinjection
       uses: actions/checkout@v2
       with:
         repository: libinjection/libinjection
+    - name: Build and install libinjection
       run: |
         gcc -std=c99 -Wall -Werror -fpic -c src/libinjection_sqli.c -o libinjection_sqli.o 
         gcc -std=c99 -Wall -Werror -fpic -c src/libinjection_xss.c -o libinjection_xss.o
