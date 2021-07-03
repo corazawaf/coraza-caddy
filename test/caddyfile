@@ -1,15 +1,16 @@
 {
-    debug
-    auto_https off
-    order coraza_waf first
+	admin off
+	debug
+	auto_https off
+	order coraza_waf first
 }
 
 http://127.0.0.1:8080 {
 	coraza_waf {
 		directives `
-			SecAction "id:1,pass,log"
-			SecRule REQUEST_URI "/test5" "id:2, deny, log, phase:1"
-			SecRule REQUEST_URI "/test6" "id:4, deny, log, phase:3"
+		SecAction "id:1,pass,log"
+		SecRule REQUEST_URI "/test5" "id:2, deny, log, phase:1"
+		SecRule REQUEST_URI "/test6" "id:4, deny, log, phase:3"
 		`
 	}
 	respond "test123"
