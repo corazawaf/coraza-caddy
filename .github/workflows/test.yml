@@ -50,6 +50,21 @@ jobs:
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
+    - name: Checkout libinjection
+      uses: actions/checkout@v2
+      with:
+        repository: libinjection/libinjection
+    - name: Build and install libinjection
+      run: |
+        gcc -std=c99 -Wall -Werror -fpic -c src/libinjection_sqli.c -o libinjection_sqli.o 
+        gcc -std=c99 -Wall -Werror -fpic -c src/libinjection_xss.c -o libinjection_xss.o
+        gcc -std=c99 -Wall -Werror -fpic -c src/libinjection_html5.c -o libinjection_html5.o
+        gcc -dynamiclib -shared -o libinjection.so libinjection_sqli.o libinjection_xss.o libinjection_html5.o
+        sudo cp *.so /usr/local/lib
+        sudo cp *.o /usr/local/lib
+        sudo cp src/*.h /usr/local/include/
+        sudo chmod 444 /usr/local/include/libinjection*
+        sudo ldconfig      
     - name: Install Go
       uses: actions/setup-go@v2
       with:
@@ -57,4 +72,5 @@ jobs:
     - name: Get xcaddy
       run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
     - name: Build
-      run: CGO_ENABLED=1 xcaddy build --with github.com/jptosso/coraza-caddy   
+      run: CGO_ENABLED=1 xcaddy build --with github.com/jptosso/coraza-caddy
+      

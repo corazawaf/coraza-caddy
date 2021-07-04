@@ -1,0 +1,12 @@
+{
+	debug
+	auto_https off
+	order coraza_waf first
+}
+
+http://127.0.0.1:8080 {
+	coraza_waf {
+		include "test/test.conf"
+	}
+	respond "test123"
+}
