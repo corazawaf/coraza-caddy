@@ -4,7 +4,7 @@
 	order coraza_waf first
 }
 
-http://127.0.0.1:8080 {
+http://127.0.0.1:55555 {
 	coraza_waf {
 		directives `
 		SecAction "id:1,pass,log"

@@ -1,13 +1,15 @@
 package coraza
 
 import (
-	"github.com/caddyserver/caddy/v2/caddytest"
 	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/caddyserver/caddy/v2/caddytest"
 )
-const baseURL = "http://127.0.0.1:8080"
+
+const baseURL = "http://127.0.0.1:55555"
 
 func TestPlugin(t *testing.T) {
 	tester, err := newCaddyTester("test/caddyfile", t)
@@ -51,7 +53,7 @@ func TestPhase3Disruption(t *testing.T) {
 	time.Sleep(1 * time.Second)
 }
 
-func newCaddyTester(caddyfile string, t *testing.T) (*caddytest.Tester, error){
+func newCaddyTester(caddyfile string, t *testing.T) (*caddytest.Tester, error) {
 	tester := caddytest.NewTester(t)
 	configFile := caddyfile
 	configContent, err := ioutil.ReadFile(configFile)
