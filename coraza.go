@@ -2,14 +2,15 @@ package coraza
 
 import (
 	"fmt"
-	"net/http"
 	"io"
+	"net/http"
+
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/jptosso/coraza-waf/pkg/engine"
-	"github.com/jptosso/coraza-waf/pkg/seclang"
+	engine "github.com/jptosso/coraza-waf"
+	"github.com/jptosso/coraza-waf/seclang"
 	"go.uber.org/zap"
 )
 
@@ -19,7 +20,7 @@ func init() {
 }
 
 type Middleware struct {
-	Include    string `json:"include"`
+	Include           string `json:"include"`
 	Directives        string `json:"directives"`
 	TemplateForbidden string `json:"template_forbidden"`
 

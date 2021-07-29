@@ -1,0 +1,134 @@
+before:
+  hooks:
+    # The build is done in this particular way to build Caddy in a designated directory named in .gitignore.
+    # This is so we can run goreleaser on tag without Git complaining of being dirty. The main.go in cmd/caddy directory 
+    # cannot be built within that directory due to changes necessary for the build causing Git to be dirty, which
+    # subsequently causes gorleaser to refuse running.
+    - mkdir -p caddy-build
+    - cp builder/main.go caddy-build/main.go
+    - cp ./go.mod caddy-build/go.mod
+    - sed -i 's|github.com/jptosso/coraza-caddy/v1|coraza|g' ./caddy-build/go.mod
+    # GoReleaser doesn't seem to offer {{.Tag}} at this stage, so we have to embed it into the env
+    # so we run: TAG=$(git describe --abbrev=0) goreleaser release --rm-dist --skip-publish --skip-validate
+    - go mod edit -require=github.com/jptosso/coraza-caddy@latest ./caddy-build/go.mod
+    #{{.Env.TAG}} ./caddy-build/go.mod
+    # as of Go 1.16, `go` commands no longer automatically change go.{mod,sum}. We now have to explicitly
+    # run `go mod tidy`. The `/bin/sh -c '...'` is because goreleaser can't find cd in PATH without shell invocation.
+    - /bin/sh -c 'cd ./caddy-build && go mod tidy'
+    - git clone --depth 1 https://github.com/caddyserver/dist caddy-dist
+    - go mod download
+    - git clone --depth 1 https://github.com/libinjection/libinjection
+
+builds:
+- env:
+  - CGO_ENABLED=1
+  - GO111MODULE=on
+  main: main.go
+  dir: ./caddy-build
+  binary: caddy
+  goos:
+  #- darwin
+  - linux
+  #- windows
+  - freebsd
+  goarch:
+  - amd64
+  #- arm
+  #- arm64
+  #- s390x
+  #- ppc64le
+  goarm:
+  - 5
+  - 6
+  - 7
+  ignore:
+    - goos: darwin
+      goarch: arm
+    - goos: darwin
+      goarch: ppc64le
+    - goos: darwin
+      goarch: s390x
+    - goos: windows
+      goarch: ppc64le
+    - goos: windows
+      goarch: s390x
+    - goos: freebsd
+      goarch: ppc64le
+    - goos: freebsd
+      goarch: s390x
+    - goos: freebsd
+      goarch: arm
+      goarm: 5
+  flags:
+  - -trimpath
+  ldflags:
+  - -s -w
+
+archives:
+  - format_overrides:
+      - goos: windows
+        format: zip
+    replacements:
+      darwin: mac
+checksum:
+  algorithm: sha512
+
+nfpms:
+  - id: default
+    package_name: coraza-caddy
+
+    vendor: Coraza Technologies
+    homepage: https://github.com/jptosso/coraza-waf
+    maintainer: Juan Pablo Tosso <jptosso@gmail.com>
+    description: |
+      Caddy - Powerful, enterprise-ready, open source web server with automatic HTTPS written in Go. This build was integrated with Coraza Web Application Firewall
+    license: Apache 2.0
+
+    formats:
+      - deb
+      # - rpm
+
+    bindir: /usr/bin
+    contents:
+      - src: ./caddy-dist/init/caddy.service
+        dst: /lib/systemd/system/caddy.service
+        
+      - src: ./caddy-dist/init/caddy-api.service
+        dst: /lib/systemd/system/caddy-api.service
+      
+      - src: ./caddy-dist/welcome/index.html
+        dst: /usr/share/caddy/index.html
+      
+      - src: ./caddy-dist/scripts/completions/bash-completion
+        dst: /etc/bash_completion.d/caddy
+
+      - src: ./libinjection/libinjection.so
+        dst: /usr/local/lib/libinjection.so      
+    
+      - src: ./caddy-dist/config/Caddyfile
+        dst: /etc/caddy/Caddyfile
+        type: config
+
+    scripts:
+      postinstall: ./caddy-dist/scripts/postinstall.sh
+      preremove: ./caddy-dist/scripts/preremove.sh
+      postremove: ./caddy-dist/scripts/postremove.sh
+
+
+release:
+  github:
+    owner: jptosso
+    name: coraza-docker
+  draft: true
+  prerelease: auto
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^chore:'
+    - '^ci:'
+    - '^docs?:'
+    - '^readme:'
+    - '^tests?:'
+    - '^\w+\s+' # a hack to remove commit messages without colons thus don't correspond to a package

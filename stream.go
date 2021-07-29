@@ -3,17 +3,18 @@ package coraza
 import (
 	"io"
 	"net/http"
+
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/jptosso/coraza-waf/pkg/engine"
+	engine "github.com/jptosso/coraza-waf"
 )
 
 type StreamRecorder struct {
 	*caddyhttp.ResponseWriterWrapper
-	transaction         *engine.Transaction
-	statusCode          int
-	wroteHeader         bool
+	transaction *engine.Transaction
+	statusCode  int
+	wroteHeader bool
 
-	stream  bool
+	stream bool
 }
 
 func (sr *StreamRecorder) WriteHeader(statusCode int) {
@@ -30,14 +31,14 @@ func (sr *StreamRecorder) WriteHeader(statusCode int) {
 	}
 	sr.transaction.ProcessResponseHeaders(statusCode, "http/1.1")
 	// we take care of unwanted responses
-	if !sr.transaction.IsProcessableResponseBody() { 
+	if !sr.transaction.IsProcessableResponseBody() {
 		sr.stream = true
 	}
 	// We won't send response headers on stream if the transaction was interrupted
 	// So the module can send an error page
 	if sr.transaction.Interruption == nil && sr.stream {
 		sr.ResponseWriter.WriteHeader(sr.statusCode)
-	}else{
+	} else {
 		sr.stream = false
 	}
 }
@@ -53,7 +54,7 @@ func (sr *StreamRecorder) Write(data []byte) (int, error) {
 		return sr.ResponseWriterWrapper.Write(data)
 	}
 
-	sr.transaction.ResponseBodyReader.Write(data)
+	sr.transaction.ResponseBodyBuffer.Write(data)
 	return len(data), nil
 }
 
@@ -62,7 +63,7 @@ func (sr *StreamRecorder) Reader() io.Reader {
 	if sr.stream {
 		return nil
 	}
-	return sr.transaction.ResponseBodyReader.Reader()
+	return sr.transaction.ResponseBodyBuffer.Reader()
 }
 
 // Buffered returns true if the response is stored inside the transaction
@@ -75,9 +76,9 @@ func (sr *StreamRecorder) Status() int {
 	return sr.statusCode
 }
 
-func NewStreamRecorder(w http.ResponseWriter, tx *engine.Transaction) *StreamRecorder{
+func NewStreamRecorder(w http.ResponseWriter, tx *engine.Transaction) *StreamRecorder {
 	return &StreamRecorder{
 		ResponseWriterWrapper: &caddyhttp.ResponseWriterWrapper{ResponseWriter: w},
-		transaction: tx,
+		transaction:           tx,
 	}
 }
