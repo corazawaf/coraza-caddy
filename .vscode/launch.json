@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Package",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/builder/main.go",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "run", "--config", "${input:caddyfile}", "--adapter", "caddyfile", "--watch"
+            ]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "caddyfile",
+            "description": "Path to Caddyfile",
+            "default": "/tmp/Caddyfile",
+            "type": "promptString"
+        }
+    ]
+}

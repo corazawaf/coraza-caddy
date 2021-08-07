@@ -1,6 +1,7 @@
 package coraza
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,21 +21,11 @@ func init() {
 }
 
 type Middleware struct {
-	Include           string `json:"include"`
-	Directives        string `json:"directives"`
-	TemplateForbidden string `json:"template_forbidden"`
-
-	//for cache
-	templateForbiddenContent []byte
+	Include    string `json:"include"`
+	Directives string `json:"directives"`
 
 	logger *zap.Logger
 	waf    *engine.Waf
-}
-
-func (m *Middleware) ErrorPage(w http.ResponseWriter) {
-	w.WriteHeader(500)
-	w.Write(m.templateForbiddenContent)
-	m.logger.Debug("Transaction disrupted")
 }
 
 // CaddyModule returns the Caddy module information.
@@ -72,15 +63,13 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	var err error
 	tx := m.waf.NewTransaction()
 	defer tx.ProcessLogging()
-	m.logger.Debug(fmt.Sprintf("[coraza] Executing transaction %s", tx.Id))
+	m.logger.Debug(fmt.Sprintf("Evaluating transaction %s", tx.Id))
 	it, err := tx.ProcessRequest(r)
 	if err != nil {
 		return err
 	}
 	if it != nil {
-		//disrupted
-		m.ErrorPage(w)
-		return nil
+		return errors.New("transaction disrupted")
 	}
 
 	rec := NewStreamRecorder(w, tx)
@@ -90,8 +79,7 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	}
 	// If the response was interrupted during phase 3 or 4 we can stop the response
 	if tx.Interruption != nil {
-		m.ErrorPage(w)
-		return nil
+		return errors.New("transaction disrupted")
 	}
 	if !rec.Buffered() {
 		//Nothing to do, response was already sent to the client
@@ -123,8 +111,6 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			m.Include = value
 		case "directives":
 			m.Directives = value
-		case "template_forbidden":
-			m.TemplateForbidden = value
 		default:
 			return d.Err(fmt.Sprintf("invalid key for filter directive: %s", key))
 		}

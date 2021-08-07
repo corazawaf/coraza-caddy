@@ -38,7 +38,6 @@ func (sr *StreamRecorder) WriteHeader(statusCode int) {
 	// So the module can send an error page
 	if sr.transaction.Interruption == nil && sr.stream {
 		sr.ResponseWriter.WriteHeader(sr.statusCode)
-	} else {
 		sr.stream = false
 	}
 }
