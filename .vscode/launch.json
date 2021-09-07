@@ -6,7 +6,7 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/builder/main.go",
+            "program": "${workspaceFolder}/caddy/main.go",
             "cwd": "${workspaceFolder}",
             "args": [
                 "run", "--config", "${input:caddyfile}", "--adapter", "caddyfile", "--watch"

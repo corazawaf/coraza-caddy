@@ -5,40 +5,40 @@ before:
     # cannot be built within that directory due to changes necessary for the build causing Git to be dirty, which
     # subsequently causes gorleaser to refuse running.
     - mkdir -p caddy-build
-    - cp builder/main.go caddy-build/main.go
-    - cp ./go.mod caddy-build/go.mod
-    - sed -i 's|github.com/jptosso/coraza-caddy/v1|coraza|g' ./caddy-build/go.mod
+    - cp caddy/main.go caddy-build/main.go
+    - cp go.mod caddy-build/go.mod
+    # BSD systems require an empty string before the expression
+    - sed -i '' 's|github.com/jptosso/coraza-caddy|coraza|g' caddy-build/go.mod
     # GoReleaser doesn't seem to offer {{.Tag}} at this stage, so we have to embed it into the env
     # so we run: TAG=$(git describe --abbrev=0) goreleaser release --rm-dist --skip-publish --skip-validate
-    - go mod edit -require=github.com/jptosso/coraza-caddy@latest ./caddy-build/go.mod
+    - go mod edit -require=github.com/jptosso/coraza-caddy@master caddy-build/go.mod
     #{{.Env.TAG}} ./caddy-build/go.mod
     # as of Go 1.16, `go` commands no longer automatically change go.{mod,sum}. We now have to explicitly
     # run `go mod tidy`. The `/bin/sh -c '...'` is because goreleaser can't find cd in PATH without shell invocation.
     - /bin/sh -c 'cd ./caddy-build && go mod tidy'
     - git clone --depth 1 https://github.com/caddyserver/dist caddy-dist
     - go mod download
-    - git clone --depth 1 https://github.com/libinjection/libinjection
 
 builds:
 - env:
-  - CGO_ENABLED=1
+  - CGO_ENABLED=0
   - GO111MODULE=on
   main: main.go
   dir: ./caddy-build
   binary: caddy
   goos:
-  #- darwin
+  - darwin
   - linux
-  #- windows
+  - windows
   - freebsd
   goarch:
   - amd64
-  #- arm
-  #- arm64
-  #- s390x
-  #- ppc64le
+  - arm
+  - arm64
+  #- s390x cannot compile :(
+  - ppc64le
   goarm:
-  - 5
+  #- 5 syslog fails here
   - 6
   - 7
   ignore:
@@ -81,12 +81,12 @@ nfpms:
     homepage: https://github.com/jptosso/coraza-waf
     maintainer: Juan Pablo Tosso <jptosso@gmail.com>
     description: |
-      Caddy - Powerful, enterprise-ready, open source web server with automatic HTTPS written in Go. This build was integrated with Coraza Web Application Firewall
+      Caddy - Powerful, enterprise-ready, open source web server with automatic HTTPS written in Go. Integrated with Coraza Web Application Firewall
     license: Apache 2.0
 
     formats:
       - deb
-      # - rpm
+      - rpm
 
     bindir: /usr/bin
     contents:
@@ -113,12 +113,10 @@ nfpms:
       postinstall: ./caddy-dist/scripts/postinstall.sh
       preremove: ./caddy-dist/scripts/preremove.sh
       postremove: ./caddy-dist/scripts/postremove.sh
-
-
 release:
   github:
     owner: jptosso
-    name: coraza-docker
+    name: coraza-caddy
   draft: true
   prerelease: auto
 

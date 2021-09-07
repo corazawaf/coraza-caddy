@@ -5,12 +5,12 @@ import (
 	"net/http"
 
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	engine "github.com/jptosso/coraza-waf"
+	"github.com/jptosso/coraza-waf"
 )
 
 type StreamRecorder struct {
 	*caddyhttp.ResponseWriterWrapper
-	transaction *engine.Transaction
+	transaction *coraza.Transaction
 	statusCode  int
 	wroteHeader bool
 
@@ -75,7 +75,7 @@ func (sr *StreamRecorder) Status() int {
 	return sr.statusCode
 }
 
-func NewStreamRecorder(w http.ResponseWriter, tx *engine.Transaction) *StreamRecorder {
+func NewStreamRecorder(w http.ResponseWriter, tx *coraza.Transaction) *StreamRecorder {
 	return &StreamRecorder{
 		ResponseWriterWrapper: &caddyhttp.ResponseWriterWrapper{ResponseWriter: w},
 		transaction:           tx,
