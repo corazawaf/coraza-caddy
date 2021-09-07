@@ -32,10 +32,10 @@ jobs:
         gcc -std=c99 -Wall -Werror -fpic -c $TMPDIR/src/libinjection_xss.c -o $TMPDIR/libinjection_xss.o
         gcc -std=c99 -Wall -Werror -fpic -c $TMPDIR/src/libinjection_html5.c -o $TMPDIR/libinjection_html5.o
         gcc -dynamiclib -shared -o $TMPDIR/libinjection.so $TMPDIR/libinjection_sqli.o $TMPDIR/libinjection_xss.o $TMPDIR/libinjection_html5.o
-        cp $TMPDIR/*.so /usr/local/lib
-        cp $TMPDIR/*.o /usr/local/lib
-        cp $TMPDIR/src/*.h /usr/local/include/
-        chmod 444 /usr/local/include/libinjection*
+        sudo cp $TMPDIR/*.so /usr/local/lib
+        sudo cp $TMPDIR/*.o /usr/local/lib
+        sudo cp $TMPDIR/src/*.h /usr/local/include/
+        sudo chmod 444 /usr/local/include/libinjection*
         rm -rf /tmp/libinjection
         sudo ldconfig
         # Used to store log files for testing
