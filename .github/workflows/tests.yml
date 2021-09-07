@@ -27,14 +27,14 @@ jobs:
     - name: Setup libinjection
       run: |
         TMPDIR=/tmp/libinjection
-        REPO=https://github.com/libinjection/libinjection
-        gcc -std=c99 -Wall -Werror -fpic -c $(TMPDIR)/src/libinjection_sqli.c -o $(TMPDIR)/libinjection_sqli.o 
-        gcc -std=c99 -Wall -Werror -fpic -c $(TMPDIR)/src/libinjection_xss.c -o $(TMPDIR)/libinjection_xss.o
-        gcc -std=c99 -Wall -Werror -fpic -c $(TMPDIR)/src/libinjection_html5.c -o $(TMPDIR)/libinjection_html5.o
-        gcc -dynamiclib -shared -o $(TMPDIR)/libinjection.so $(TMPDIR)/libinjection_sqli.o $(TMPDIR)/libinjection_xss.o $(TMPDIR)/libinjection_html5.o
-        cp $(TMPDIR)/*.so /usr/local/lib
-        cp $(TMPDIR)/*.o /usr/local/lib
-        cp $(TMPDIR)/src/*.h /usr/local/include/
+        git clone https://github.com/libinjection/libinjection $TMPDIR
+        gcc -std=c99 -Wall -Werror -fpic -c $TMPDIR/src/libinjection_sqli.c -o $TMPDIR/libinjection_sqli.o 
+        gcc -std=c99 -Wall -Werror -fpic -c $TMPDIR/src/libinjection_xss.c -o $TMPDIR/libinjection_xss.o
+        gcc -std=c99 -Wall -Werror -fpic -c $TMPDIR/src/libinjection_html5.c -o $TMPDIR/libinjection_html5.o
+        gcc -dynamiclib -shared -o $TMPDIR/libinjection.so $TMPDIR/libinjection_sqli.o $TMPDIR/libinjection_xss.o $TMPDIR/libinjection_html5.o
+        cp $TMPDIR/*.so /usr/local/lib
+        cp $TMPDIR/*.o /usr/local/lib
+        cp $TMPDIR/src/*.h /usr/local/include/
         chmod 444 /usr/local/include/libinjection*
         rm -rf /tmp/libinjection
         sudo ldconfig
