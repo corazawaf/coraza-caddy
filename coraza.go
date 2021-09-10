@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -24,8 +25,9 @@ type Middleware struct {
 	Include    string `json:"include"`
 	Directives string `json:"directives"`
 
-	logger *zap.Logger
-	waf    *engine.Waf
+	includes []string
+	logger   *zap.Logger
+	waf      *engine.Waf
 }
 
 // CaddyModule returns the Caddy module information.
@@ -43,7 +45,10 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	m.waf = engine.NewWaf()
 	pp, _ := seclang.NewParser(m.waf)
 	if m.Include != "" {
-		err = pp.FromFile(m.Include)
+		files := strings.Split(m.Include, " ")
+		for _, f := range files {
+			err = pp.FromFile(f)
+		}
 	} else {
 		err = pp.FromString(m.Directives)
 	}
