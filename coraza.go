@@ -25,9 +25,8 @@ type Middleware struct {
 	Include    string `json:"include"`
 	Directives string `json:"directives"`
 
-	includes []string
-	logger   *zap.Logger
-	waf      *engine.Waf
+	logger *zap.Logger
+	waf    *engine.Waf
 }
 
 // CaddyModule returns the Caddy module information.
@@ -43,6 +42,7 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	var err error
 	m.logger = ctx.Logger(m)
 	m.waf = engine.NewWaf()
+	m.waf.ErrorLogger = &errLogger{ctx.Logger(m)}
 	pp, _ := seclang.NewParser(m.waf)
 	if m.Include != "" {
 		files := strings.Split(m.Include, " ")
