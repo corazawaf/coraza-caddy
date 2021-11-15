@@ -1,7 +1,6 @@
 package coraza
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,8 +10,9 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	engine "github.com/jptosso/coraza-waf"
-	"github.com/jptosso/coraza-waf/seclang"
+	"github.com/jptosso/coraza-waf/v2"
+	"github.com/jptosso/coraza-waf/v2/seclang"
+	"github.com/jptosso/coraza-waf/v2/types"
 	"go.uber.org/zap"
 )
 
@@ -26,7 +26,7 @@ type Middleware struct {
 	Directives string `json:"directives"`
 
 	logger *zap.Logger
-	waf    *engine.Waf
+	waf    *coraza.Waf
 }
 
 // CaddyModule returns the Caddy module information.
@@ -41,8 +41,8 @@ func (Middleware) CaddyModule() caddy.ModuleInfo {
 func (m *Middleware) Provision(ctx caddy.Context) error {
 	var err error
 	m.logger = ctx.Logger(m)
-	m.waf = engine.NewWaf()
-	m.waf.ErrorLogger = &errLogger{ctx.Logger(m)}
+	m.waf = coraza.NewWaf()
+	m.waf.SetErrorLogCb(logger(m.logger))
 	pp, _ := seclang.NewParser(m.waf)
 	if m.Include != "" {
 		files := strings.Split(m.Include, " ")
@@ -74,7 +74,8 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		return err
 	}
 	if it != nil {
-		return errors.New("transaction disrupted")
+		interrupt(w, r, next, tx)
+		return nil
 	}
 
 	rec := NewStreamRecorder(w, tx)
@@ -84,7 +85,8 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	}
 	// If the response was interrupted during phase 3 or 4 we can stop the response
 	if tx.Interruption != nil {
-		return errors.New("transaction disrupted")
+		interrupt(w, r, next, tx)
+		return nil
 	}
 	if !rec.Buffered() {
 		//Nothing to do, response was already sent to the client
@@ -128,6 +130,35 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	var m Middleware
 	err := m.UnmarshalCaddyfile(h.Dispenser)
 	return m, err
+}
+
+func logger(logger *zap.Logger) coraza.ErrorLogCallback {
+	return func(mr coraza.MatchedRule) {
+		data := mr.ErrorLog(403)
+		switch mr.Rule.Severity {
+		case types.RuleSeverityEmergency:
+			logger.Error(data)
+		case types.RuleSeverityAlert:
+			logger.Error(data)
+		case types.RuleSeverityCritical:
+			logger.Error(data)
+		case types.RuleSeverityError:
+			logger.Error(data)
+		case types.RuleSeverityWarning:
+			logger.Warn(data)
+		case types.RuleSeverityNotice:
+			logger.Info(data)
+		case types.RuleSeverityInfo:
+			logger.Info(data)
+		case types.RuleSeverityDebug:
+			logger.Debug(data)
+		}
+	}
+}
+
+func interrupt(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler, tx *coraza.Transaction) {
+	//w.WriteHeader(403)
+	w.Write([]byte("Forbidden"))
 }
 
 // Interface guards

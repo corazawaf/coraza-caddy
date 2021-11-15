@@ -4,10 +4,10 @@
     order coraza_waf first
 }
 
-http://127.0.0.1:8080 {
+http://127.0.0.1:80 {
 	coraza_waf {
 		directives `
-			SecAction "id:1,pass,log"
+			SecAction "id:149,pass,log, msg:'Some test msg',logdata:'logdata'"
 			SecRule REQUEST_URI "/test5" "id:2, deny, log, phase:1"
 			SecRule REQUEST_URI "/test6" "id:4, deny, log, phase:3"
 		`
