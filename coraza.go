@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/caddyserver/caddy/v2"
@@ -44,16 +45,25 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 	m.waf = coraza.NewWaf()
 	m.waf.SetErrorLogCb(logger(m.logger))
 	pp, _ := seclang.NewParser(m.waf)
+	if m.Directives != "" {
+		if err = pp.FromString(m.Directives); err != nil {
+			return err
+		}
+	}
 	if m.Include != "" {
 		files := strings.Split(m.Include, " ")
-		for _, f := range files {
-			err = pp.FromFile(f)
+		for _, file := range files {
+			// we get files as expandables globs (with wildcard patterns)
+			fs, err := filepath.Glob(file)
+			if err != nil {
+				return err
+			}
+			for _, f := range fs {
+				if err = pp.FromFile(f); err != nil {
+					return err
+				}
+			}
 		}
-	} else {
-		err = pp.FromString(m.Directives)
-	}
-	if err != nil {
-		return fmt.Errorf("cannot load waf directives %w", err)
 	}
 	return nil
 }
@@ -157,7 +167,7 @@ func logger(logger *zap.Logger) coraza.ErrorLogCallback {
 }
 
 func interrupt(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler, tx *coraza.Transaction) {
-	//w.WriteHeader(403)
+	w.WriteHeader(403)
 	w.Write([]byte("Forbidden"))
 }
 

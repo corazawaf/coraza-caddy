@@ -4,12 +4,15 @@
     order coraza_waf first
 }
 
-http://127.0.0.1:80 {
+http://127.0.0.1:8080 {
 	coraza_waf {
 		directives `
+			SecDebugLogLevel 5
+			SecDebugLog /tmp/asdf.log
+			SecRuleEngine On
 			SecAction "id:149,pass,log, msg:'Some test msg',logdata:'logdata'"
-			SecRule REQUEST_URI "/test5" "id:2, deny, log, phase:1"
-			SecRule REQUEST_URI "/test6" "id:4, deny, log, phase:3"
+			SecRule REQUEST_URI "test5" "id:2, deny, log, phase:1,status:403"
+			SecRule REQUEST_URI "test6" "id:4, deny, log, phase:3,status:403"
 		`
 	}
 	respond "test123"
