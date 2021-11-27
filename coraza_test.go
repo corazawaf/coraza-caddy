@@ -49,6 +49,16 @@ func TestSimpleRule(t *testing.T) {
 	tester.AssertResponseCode(req, 403)
 
 	time.Sleep(1 * time.Second)
+
+	req, _ = http.NewRequest("GET", baseURL+"/test_include1", nil)
+	tester.AssertResponseCode(req, 403)
+
+	time.Sleep(1 * time.Second)
+
+	req, _ = http.NewRequest("GET", baseURL+"/test_include2", nil)
+	tester.AssertResponseCode(req, 403)
+
+	time.Sleep(1 * time.Second)
 }
 
 func TestPhase3Disruption(t *testing.T) {

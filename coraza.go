@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
-	"strings"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -23,8 +22,8 @@ func init() {
 }
 
 type Middleware struct {
-	Include    string `json:"include"`
-	Directives string `json:"directives"`
+	Include    []string `json:"include"`
+	Directives string   `json:"directives"`
 
 	logger *zap.Logger
 	waf    *coraza.Waf
@@ -50,9 +49,8 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 			return err
 		}
 	}
-	if m.Include != "" {
-		files := strings.Split(m.Include, " ")
-		for _, file := range files {
+	if len(m.Include) > 0 {
+		for _, file := range m.Include {
 			// we get files as expandables globs (with wildcard patterns)
 			fs, err := filepath.Glob(file)
 			if err != nil {
@@ -78,7 +76,6 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	var err error
 	tx := m.waf.NewTransaction()
 	defer tx.ProcessLogging()
-	m.logger.Debug(fmt.Sprintf("Evaluating transaction %s", tx.Id))
 	it, err := tx.ProcessRequest(r)
 	if err != nil {
 		return err
@@ -116,6 +113,7 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	if !d.Next() {
 		return d.Err("expected token following filter")
 	}
+	m.Include = []string{}
 	for d.NextBlock(0) {
 		key := d.Val()
 		var value string
@@ -125,7 +123,7 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		}
 		switch key {
 		case "include":
-			m.Include = value
+			m.Include = append(m.Include, value)
 		case "directives":
 			m.Directives = value
 		default:
