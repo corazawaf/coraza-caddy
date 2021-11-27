@@ -11,14 +11,13 @@ before:
     - sed -i '' 's|github.com/jptosso/coraza-caddy|coraza|g' caddy-build/go.mod
     # GoReleaser doesn't seem to offer {{.Tag}} at this stage, so we have to embed it into the env
     # so we run: TAG=$(git describe --abbrev=0) goreleaser release --rm-dist --skip-publish --skip-validate
-    - go mod edit -require=github.com/jptosso/coraza-caddy@master caddy-build/go.mod
+    - go mod edit -require=github.com/jptosso/coraza-caddy@4bcd691 caddy-build/go.mod
     #{{.Env.TAG}} ./caddy-build/go.mod
     # as of Go 1.16, `go` commands no longer automatically change go.{mod,sum}. We now have to explicitly
     # run `go mod tidy`. The `/bin/sh -c '...'` is because goreleaser can't find cd in PATH without shell invocation.
     - /bin/sh -c 'cd ./caddy-build && go mod tidy'
     - git clone --depth 1 https://github.com/caddyserver/dist caddy-dist
     - go mod download
-
 builds:
 - env:
   - CGO_ENABLED=0
@@ -29,18 +28,19 @@ builds:
   goos:
   - darwin
   - linux
-  - windows
-  - freebsd
+  #- windows not compatible yet
+  #- freebsd not tested
   goarch:
   - amd64
   - arm
   - arm64
   #- s390x cannot compile :(
-  - ppc64le
+  #- ppc64le why would we support that?
   goarm:
-  #- 5 syslog fails here
+  #- 5 syslog fails here, and it is not supported by golang 1.18
   - 6
   - 7
+  - 8
   ignore:
     - goos: darwin
       goarch: arm
@@ -100,10 +100,7 @@ nfpms:
         dst: /usr/share/caddy/index.html
       
       - src: ./caddy-dist/scripts/completions/bash-completion
-        dst: /etc/bash_completion.d/caddy
-
-      - src: ./libinjection/libinjection.so
-        dst: /usr/local/lib/libinjection.so      
+        dst: /etc/bash_completion.d/caddy 
     
       - src: ./caddy-dist/config/Caddyfile
         dst: /etc/caddy/Caddyfile

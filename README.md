@@ -12,10 +12,7 @@ Coraza Caddy Module provides SecRule compatibility for your web applications dep
 
 * [Xcaddy](https://github.com/caddyserver/xcaddy#install)
 * [Golang 1.16+](https://golang.org/doc/install)
-* [Libinjection](https://github.com/jptosso/coraza-waf#prerequisites)
-* [Libpcre](https://github.com/jptosso/coraza-waf#prerequisites)
-* Unix Operating system (Coraza does not support Windows)
-* CGO enabled `export CGO_ENABLED=1`
+* Linux Operating system (Coraza does not support Windows)
 
 ## Plugin syntax
 
@@ -26,7 +23,6 @@ coraza {
 		SecAction "id:1,pass,log"
 	`
 	include /path/to/config.conf
-	template_forbidden /path/to/template.html
 }
 ```
 
@@ -45,6 +41,7 @@ http://127.0.0.1:8080 {
 			SecRule REQUEST_URI "/test5" "id:2, deny, log, phase:1"
 			SecRule REQUEST_URI "/test6" "id:4, deny, log, phase:3"
 		`
+		include file1.conf file2.conf /some/path/*.conf
 	}
 	reverse_proxy http://192.168.1.15:8080
 }
@@ -55,10 +52,8 @@ http://127.0.0.1:8080 {
 Run:
 
 ```
-CGO_ENABLED=1 xcaddy build --with github.com/jptosso/coraza-caddy
+xcaddy build --with github.com/jptosso/coraza-caddy
 ```
-
-Please note that in order to distribute the Caddy binary with Coraza WAF you must also install libinjection and libpcre on each installation.
 
 ## Testing
 

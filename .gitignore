@@ -3,3 +3,5 @@ caddy-dist/
 dist/
 libinjection/
 vendor/
+.vscode/
+.DS_Store
