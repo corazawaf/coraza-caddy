@@ -1,14 +1,12 @@
 # Coraza WAF Caddy Module
 
-<a href="https://github.com/jptosso/coraza-caddy/actions/" target="_blank"><img src="https://github.com/jptosso/coraza-caddy/workflows/regression/badge.svg?branch=main"></a>
+[![Tests](https://github.com/jptosso/coraza-caddy/actions/workflows/tests.yml/badge.svg)](https://github.com/jptosso/coraza-caddy/actions/workflows/tests.yml)
 <a href="https://pkg.go.dev/github.com/jptosso/coraza-caddy" target="_blank"><img src="https://img.shields.io/badge/godoc-reference-blue.svg"></a>
 [![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 
 Coraza Caddy Module provides SecRule compatibility for your web applications deployed using Caddy.
 
 ## Prerequisites
-
-[(See Coraza Documentation)](https://github.com/jptosso/coraza-waf#prerequisites)
 
 * [Xcaddy](https://github.com/caddyserver/xcaddy#install)
 * [Golang 1.16+](https://golang.org/doc/install)
@@ -41,7 +39,9 @@ http://127.0.0.1:8080 {
 			SecRule REQUEST_URI "/test5" "id:2, deny, log, phase:1"
 			SecRule REQUEST_URI "/test6" "id:4, deny, log, phase:3"
 		`
-		include file1.conf file2.conf /some/path/*.conf
+		include file1.conf 
+		include file2.conf
+		include /some/path/*.conf
 	}
 	reverse_proxy http://192.168.1.15:8080
 }
@@ -62,8 +62,12 @@ You may run the test suite by executing:
 ```
 $ git clone https://github.com/jptosso/coraza-caddy
 $ cd coraza-caddy
-$ CGO_ENABLED go test ./...`
+$ go test ./...`
 ```
+
+## Compiling with CRS support
+
+Uncomment the plugins github.com/jptosso/coraza-libinjection and github.com/coraza-pcre from caddy/main.go and then compile.
 
 ## Known Issues
 
