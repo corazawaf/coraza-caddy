@@ -4,3 +4,4 @@ dist/
 libinjection/
 vendor/
 .vscode/
+.DS_Store
