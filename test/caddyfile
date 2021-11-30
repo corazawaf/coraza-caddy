@@ -4,7 +4,7 @@
     order coraza_waf first
 }
 
-http://127.0.0.1:8080 {
+:8080 {
 	coraza_waf {
 		directives `
 			SecAction "id:149,pass,log, msg:'Some test msg',logdata:'logdata'"
@@ -14,5 +14,6 @@ http://127.0.0.1:8080 {
 		include test/sample1.conf
 		include test/sample2.conf
 	}
+	header * x-request-id "{http.transaction_id}"
 	respond "test123"
 }
