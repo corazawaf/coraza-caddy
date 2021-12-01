@@ -77,7 +77,7 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	tx := m.waf.NewTransaction()
 	defer tx.ProcessLogging()
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
-	repl.Set("http.transaction_id", tx.Id)
+	repl.Set("http.transaction_id", tx.ID)
 
 	it, err := tx.ProcessRequest(r)
 	if err != nil {
