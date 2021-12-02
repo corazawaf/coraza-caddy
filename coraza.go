@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -49,15 +50,25 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 			return err
 		}
 	}
+	m.logger.Debug("Preparing to include files", zap.Int("count", len(m.Include)), zap.Strings("files", m.Include))
 	if len(m.Include) > 0 {
 		for _, file := range m.Include {
-			// we get files as expandables globs (with wildcard patterns)
-			fs, err := filepath.Glob(file)
-			if err != nil {
-				return err
-			}
-			for _, f := range fs {
-				if err = pp.FromFile(f); err != nil {
+			if strings.Contains(file, "*") {
+				m.logger.Debug("Preparing to expand glob", zap.String("pattern", file))
+				// we get files as expandables globs (with wildcard patterns)
+				fs, err := filepath.Glob(file)
+				if err != nil {
+					return err
+				}
+				m.logger.Debug("Glob expanded", zap.String("pattern", file), zap.Strings("files", fs))
+				for _, f := range fs {
+					if err = pp.FromFile(f); err != nil {
+						return err
+					}
+				}
+			} else {
+				m.logger.Debug("File was not a pattern, compiling it", zap.String("file", file))
+				if err = pp.FromFile(file); err != nil {
 					return err
 				}
 			}
