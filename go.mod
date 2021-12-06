@@ -5,7 +5,9 @@ go 1.16
 require (
 	github.com/caddyserver/caddy/v2 v2.4.5
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/jptosso/coraza-waf/v2 v2.0.0-beta.3.0.20211202024804-064758835d9e
+	github.com/jptosso/coraza-libinjection v0.0.0-20211201204751-f462893b4e60
+	github.com/jptosso/coraza-pcre v0.0.0-20211201204829-1bea0f044896
+	github.com/jptosso/coraza-waf/v2 v2.0.0-beta.3.0.20211206214914-24af0c8cf4f1
 	github.com/miekg/dns v1.1.43 // indirect
 	github.com/prometheus/common v0.30.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect

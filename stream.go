@@ -58,9 +58,9 @@ func (sr *StreamRecorder) Write(data []byte) (int, error) {
 }
 
 // Reader provides access to the buffered/inmemory response object
-func (sr *StreamRecorder) Reader() io.Reader {
+func (sr *StreamRecorder) Reader() (io.Reader, error) {
 	if sr.stream {
-		return nil
+		return nil, nil
 	}
 	return sr.transaction.ResponseBodyBuffer.Reader()
 }

@@ -62,13 +62,13 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 				}
 				m.logger.Debug("Glob expanded", zap.String("pattern", file), zap.Strings("files", fs))
 				for _, f := range fs {
-					if err = pp.FromFile(f); err != nil {
+					if err := pp.FromFile(f); err != nil {
 						return err
 					}
 				}
 			} else {
 				m.logger.Debug("File was not a pattern, compiling it", zap.String("file", file))
-				if err = pp.FromFile(file); err != nil {
+				if err := pp.FromFile(file); err != nil {
 					return err
 				}
 			}
@@ -99,6 +99,12 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		return nil
 	}
 
+	// TODO this is a temporal fix while I fix it in coraza
+	re, err := tx.RequestBodyBuffer.Reader()
+	if err != nil {
+		return err
+	}
+	r.Body = io.NopCloser(re)
 	rec := NewStreamRecorder(w, tx)
 	err = next.ServeHTTP(rec, r)
 	if err != nil {
@@ -118,7 +124,11 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		w.WriteHeader(status)
 	}
 	// We will send the response provided by Coraza
-	_, err = io.Copy(w, rec.Reader())
+	reader, err := rec.Reader()
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(w, reader)
 	return err
 }
 
@@ -180,7 +190,7 @@ func logger(logger *zap.Logger) coraza.ErrorLogCallback {
 
 func interrupt(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler, tx *coraza.Transaction) {
 	w.WriteHeader(403)
-	w.Write([]byte("Forbidden"))
+	w.Write([]byte("Forbidden\n"))
 }
 
 // Interface guards

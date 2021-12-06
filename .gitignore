@@ -5,3 +5,4 @@ libinjection/
 vendor/
 .vscode/
 .DS_Store
+__debug*

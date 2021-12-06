@@ -1,9 +1,13 @@
 package coraza
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -93,10 +97,41 @@ func TestPostMultipart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req, _ := http.NewRequest("GET", baseURL+"/test6", nil)
-	tester.AssertResponseCode(req, 403)
+	req, _ := http.NewRequest("POST", baseURL+"/", nil)
+	if err := multipartRequest(req); err != nil {
+		t.Fatal(err)
+	}
+	tester.AssertResponseCode(req, 200)
 
 	time.Sleep(1 * time.Second)
+}
+
+func multipartRequest(req *http.Request) error {
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+	tempfile, err := os.CreateTemp("/tmp", "tmpfile*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tempfile.Name())
+	for i := 0; i < 1024*5; i++ {
+		// this should create a 5mb file
+		tempfile.Write([]byte(strings.Repeat("A", 1024)))
+	}
+	var fw io.Writer
+	if fw, err = w.CreateFormFile("fupload", tempfile.Name()); err != nil {
+		return err
+	}
+	if _, err := tempfile.Seek(0, 0); err != nil {
+		return err
+	}
+	if _, err = io.Copy(fw, tempfile); err != nil {
+		return err
+	}
+	req.Body = ioutil.NopCloser(&b)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Method = "POST"
+	return nil
 }
 
 func newTester(caddyfile string, t *testing.T) (*caddytest.Tester, error) {
