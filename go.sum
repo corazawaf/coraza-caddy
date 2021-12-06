@@ -539,10 +539,6 @@ github.com/jptosso/coraza-libinjection v0.0.0-20211201204751-f462893b4e60/go.mod
 github.com/jptosso/coraza-pcre v0.0.0-20211201204829-1bea0f044896 h1:f5iyHtkDDCYDnfDwF/zraHxy9bxwN2ChYwtPyON5vz8=
 github.com/jptosso/coraza-pcre v0.0.0-20211201204829-1bea0f044896/go.mod h1:0NieM5u5kuGbGUj+mQFIl8xUHANcYm6AnrQca25vt/0=
 github.com/jptosso/coraza-waf/v2 v2.0.0-beta.2.0.20211201203316-49869b6ff2ea/go.mod h1:d9K0ycCNi9YmgqQKjgOheq73EY4l6fB8Y6HdLWcx5FM=
-github.com/jptosso/coraza-waf/v2 v2.0.0-beta.3.0.20211202024804-064758835d9e h1:3G9vmR8Jhb9OqZmgHPU8Dp3FvRKCOqG53DKIPecAZ38=
-github.com/jptosso/coraza-waf/v2 v2.0.0-beta.3.0.20211202024804-064758835d9e/go.mod h1:d9K0ycCNi9YmgqQKjgOheq73EY4l6fB8Y6HdLWcx5FM=
-github.com/jptosso/coraza-waf/v2 v2.0.0-beta.3.0.20211206202904-04d2c21e532e h1:u9TxkAH1ZLBng2THV6yFC4xxrgEs9m3cHdl7+xbqeJE=
-github.com/jptosso/coraza-waf/v2 v2.0.0-beta.3.0.20211206202904-04d2c21e532e/go.mod h1:d9K0ycCNi9YmgqQKjgOheq73EY4l6fB8Y6HdLWcx5FM=
 github.com/jptosso/coraza-waf/v2 v2.0.0-beta.3.0.20211206214914-24af0c8cf4f1 h1:FO7IOfDta+UF0G/jievQuc3zPx+RQ9EKWgee6AFXh2o=
 github.com/jptosso/coraza-waf/v2 v2.0.0-beta.3.0.20211206214914-24af0c8cf4f1/go.mod h1:d9K0ycCNi9YmgqQKjgOheq73EY4l6fB8Y6HdLWcx5FM=
 github.com/json-iterator/go v1.1.6/go.mod h1:+SdeFBvtyEkXs7REEP0seUULqWtbJapLOCVDaaPEHmU=
