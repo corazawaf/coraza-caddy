@@ -95,8 +95,7 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		return err
 	}
 	if it != nil {
-		interrupt(w, r, next, tx)
-		return nil
+		return interrupt(nil, tx)
 	}
 
 	// TODO this is a temporal fix while I fix it in coraza
@@ -112,8 +111,7 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 	}
 	// If the response was interrupted during phase 3 or 4 we can stop the response
 	if tx.Interruption != nil {
-		interrupt(w, r, next, tx)
-		return nil
+		return interrupt(nil, tx)
 	}
 	if !rec.Buffered() {
 		//Nothing to do, response was already sent to the client
@@ -188,9 +186,23 @@ func logger(logger *zap.Logger) coraza.ErrorLogCallback {
 	}
 }
 
-func interrupt(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler, tx *coraza.Transaction) {
-	w.WriteHeader(403)
-	w.Write([]byte("Forbidden\n"))
+func interrupt(err error, tx *coraza.Transaction) error {
+	if tx.Interruption == nil {
+		return caddyhttp.HandlerError{
+			StatusCode: 500,
+			ID:         tx.ID,
+			Err:        err,
+		}
+	}
+	status := tx.Interruption.Status
+	if status <= 0 {
+		status = 403
+	}
+	return caddyhttp.HandlerError{
+		StatusCode: status,
+		ID:         tx.ID,
+		Err:        err,
+	}
 }
 
 // Interface guards
