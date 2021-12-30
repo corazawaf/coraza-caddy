@@ -86,7 +86,10 @@ func (m *Middleware) Validate() error {
 func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	var err error
 	tx := m.waf.NewTransaction()
-	defer tx.ProcessLogging()
+	defer func() {
+		tx.ProcessLogging()
+		tx.Clean()
+	}()
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
 	repl.Set("http.transaction_id", tx.ID)
 

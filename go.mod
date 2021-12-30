@@ -7,7 +7,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/jptosso/coraza-libinjection v0.0.0-20211201204751-f462893b4e60
 	github.com/jptosso/coraza-pcre v0.0.0-20211201204829-1bea0f044896
-	github.com/jptosso/coraza-waf/v2 v2.0.0-beta.6
+	github.com/jptosso/coraza-waf/v2 v2.0.0-beta.6.0.20211230143021-08551e4073d6
 	github.com/miekg/dns v1.1.43 // indirect
 	github.com/prometheus/common v0.30.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
