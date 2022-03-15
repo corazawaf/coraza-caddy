@@ -67,11 +67,11 @@ $ go test ./...`
 
 ## Compiling with CRS support
 
-Uncomment the plugins github.com/jptosso/coraza-libinjection and github.com/coraza-pcre from caddy/main.go and then compile.
+Uncomment the plugin github.com/coraza-pcre from caddy/main.go and then compile.
 
 ## Using OWASP Core Ruleset
 
-Once you have enabled your plugin, you will have to clone coreruleset and download the default coraza configurations from [Coraza repository](https://raw.githubusercontent.com/jptosso/coraza-waf/v2/master/coraza.conf-recommended), then add the following to you coraza_waf directive:
+Once you have enabled your plugin, you will have to clone coreruleset and download the default coraza configurations from [Coraza repository](https://raw.githubusercontent.com/corazawaf/coraza/v2/master/coraza.conf-recommended), then add the following to you coraza_waf directive:
 
 ```
 include caddypath/coraza.conf-recommended

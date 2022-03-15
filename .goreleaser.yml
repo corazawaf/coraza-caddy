@@ -78,7 +78,7 @@ nfpms:
     package_name: coraza-caddy
 
     vendor: Coraza Technologies
-    homepage: https://github.com/jptosso/coraza-waf
+    homepage: https://github.com/corazawaf/coraza
     maintainer: Juan Pablo Tosso <jptosso@gmail.com>
     description: |
       Caddy - Powerful, enterprise-ready, open source web server with automatic HTTPS written in Go. Integrated with Coraza Web Application Firewall
