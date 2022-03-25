@@ -1,4 +1,4 @@
-module github.com/jptosso/coraza-caddy
+module github.com/corazawaf/coraza-caddy
 
 go 1.16
 
