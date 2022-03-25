@@ -19,6 +19,7 @@ import (
 
 	_ "github.com/caddyserver/caddy/v2/modules/standard"
 	_ "github.com/corazawaf/coraza-caddy"
+
 	// You may uncomment the following lines to enable pcre plugins (if you need use crs rules)
 	// _ "github.com/jptosso/coraza-pcre"
 )
