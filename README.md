@@ -1,7 +1,7 @@
 # Coraza WAF Caddy Module
 
-[![Tests](https://github.com/jptosso/coraza-caddy/actions/workflows/tests.yml/badge.svg)](https://github.com/jptosso/coraza-caddy/actions/workflows/tests.yml)
-<a href="https://pkg.go.dev/github.com/jptosso/coraza-caddy" target="_blank"><img src="https://img.shields.io/badge/godoc-reference-blue.svg"></a>
+[![Tests](https://github.com/corazawaf/coraza-caddy/actions/workflows/tests.yml/badge.svg)](https://github.com/corazawaf/coraza-caddy/actions/workflows/tests.yml)
+<a href="https://pkg.go.dev/github.com/corazawaf/coraza-caddy" target="_blank"><img src="https://img.shields.io/badge/godoc-reference-blue.svg"></a>
 [![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 
 Coraza Caddy Module a WAF for your applications using FastCGI or reverse proxy.
@@ -52,7 +52,7 @@ http://127.0.0.1:8080 {
 Run:
 
 ```
-xcaddy build --with github.com/jptosso/coraza-caddy
+xcaddy build --with github.com/corazawaf/coraza-caddy
 ```
 
 ## Testing
@@ -60,7 +60,7 @@ xcaddy build --with github.com/jptosso/coraza-caddy
 You may run the test suite by executing:
 
 ```
-$ git clone https://github.com/jptosso/coraza-caddy
+$ git clone https://github.com/corazawaf/coraza-caddy
 $ cd coraza-caddy
 $ go test ./...`
 ```
