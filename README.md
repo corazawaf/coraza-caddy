@@ -4,7 +4,7 @@
 <a href="https://pkg.go.dev/github.com/corazawaf/coraza-caddy" target="_blank"><img src="https://img.shields.io/badge/godoc-reference-blue.svg"></a>
 [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 
-OWASP Coraza Caddy Module provides Web Application Firewall capabilities for Caddy. 
+[OWASP Coraza](https://github.com/corazawaf/coraza) Caddy Module provides Web Application Firewall capabilities for Caddy. 
 
 OWASP Coraza WAF is 100% compatible with OWASP Coreruleset and Modsecurity syntax.
 ## Plugin syntax
