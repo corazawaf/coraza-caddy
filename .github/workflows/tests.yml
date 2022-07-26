@@ -4,8 +4,14 @@ on:
   push:
     branches: 
       - '*'
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"      
   pull_request:
     branches: [ master ]
+    paths-ignore:
+      - "**/*.md"
+      - "LICENSE"    
 
 jobs:
   test:

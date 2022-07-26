@@ -1,4 +1,4 @@
-// Copyright 2022 The Corazawaf Authors.
+// Copyright 2022 Juan Pablo Tosso and the OWASP Coraza contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"github.com/corazawaf/coraza/v2"
 )
 
-type StreamRecorder struct {
+type streamRecorder struct {
 	*caddyhttp.ResponseWriterWrapper
 	transaction *coraza.Transaction
 	statusCode  int
@@ -31,7 +31,7 @@ type StreamRecorder struct {
 	stream bool
 }
 
-func (sr *StreamRecorder) WriteHeader(statusCode int) {
+func (sr *streamRecorder) WriteHeader(statusCode int) {
 	if sr.wroteHeader {
 		return
 	}
@@ -56,7 +56,7 @@ func (sr *StreamRecorder) WriteHeader(statusCode int) {
 	}
 }
 
-func (sr *StreamRecorder) Write(data []byte) (int, error) {
+func (sr *streamRecorder) Write(data []byte) (int, error) {
 	sr.WriteHeader(http.StatusOK)
 	if sr.transaction.Interruption != nil {
 		// We won't process the response body if the transaction was interrupted
@@ -67,12 +67,11 @@ func (sr *StreamRecorder) Write(data []byte) (int, error) {
 		return sr.ResponseWriterWrapper.Write(data)
 	}
 
-	sr.transaction.ResponseBodyBuffer.Write(data)
-	return len(data), nil
+	return sr.transaction.ResponseBodyBuffer.Write(data)
 }
 
 // Reader provides access to the buffered/inmemory response object
-func (sr *StreamRecorder) Reader() (io.Reader, error) {
+func (sr *streamRecorder) Reader() (io.Reader, error) {
 	if sr.stream {
 		return nil, nil
 	}
@@ -81,16 +80,16 @@ func (sr *StreamRecorder) Reader() (io.Reader, error) {
 
 // Buffered returns true if the response is stored inside the transaction
 // IF false the response was already sent to the client
-func (sr *StreamRecorder) Buffered() bool {
+func (sr *streamRecorder) Buffered() bool {
 	return !sr.stream
 }
 
-func (sr *StreamRecorder) Status() int {
+func (sr *streamRecorder) Status() int {
 	return sr.statusCode
 }
 
-func NewStreamRecorder(w http.ResponseWriter, tx *coraza.Transaction) *StreamRecorder {
-	return &StreamRecorder{
+func newStreamRecorder(w http.ResponseWriter, tx *coraza.Transaction) *streamRecorder {
+	return &streamRecorder{
 		ResponseWriterWrapper: &caddyhttp.ResponseWriterWrapper{ResponseWriter: w},
 		transaction:           tx,
 	}

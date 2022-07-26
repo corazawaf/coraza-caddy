@@ -1,4 +1,4 @@
-// Copyright 2022 The Corazawaf Authors.
+// Copyright 2022 Juan Pablo Tosso and the OWASP Coraza contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,11 +32,12 @@ import (
 )
 
 func init() {
-	caddy.RegisterModule(Middleware{})
+	caddy.RegisterModule(Coraza{})
 	httpcaddyfile.RegisterHandlerDirective("coraza_waf", parseCaddyfile)
 }
 
-type Middleware struct {
+// Coraza is a Web Application Firewall implementation for Caddy.
+type Coraza struct {
 	Include    []string `json:"include"`
 	Directives string   `json:"directives"`
 
@@ -45,15 +46,15 @@ type Middleware struct {
 }
 
 // CaddyModule returns the Caddy module information.
-func (Middleware) CaddyModule() caddy.ModuleInfo {
+func (Coraza) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID:  "http.handlers.waf",
-		New: func() caddy.Module { return new(Middleware) },
+		New: func() caddy.Module { return new(Coraza) },
 	}
 }
 
 // Provision implements caddy.Provisioner.
-func (m *Middleware) Provision(ctx caddy.Context) error {
+func (m *Coraza) Provision(ctx caddy.Context) error {
 	var err error
 	m.logger = ctx.Logger(m)
 	m.waf = coraza.NewWaf()
@@ -92,12 +93,12 @@ func (m *Middleware) Provision(ctx caddy.Context) error {
 }
 
 // Validate implements caddy.Validator.
-func (m *Middleware) Validate() error {
+func (m *Coraza) Validate() error {
 	return nil
 }
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
-func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+func (m Coraza) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	var err error
 	tx := m.waf.NewTransaction()
 	defer tx.ProcessLogging()
@@ -118,7 +119,7 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 		return err
 	}
 	r.Body = io.NopCloser(re)
-	rec := NewStreamRecorder(w, tx)
+	rec := newStreamRecorder(w, tx)
 	err = next.ServeHTTP(rec, r)
 	if err != nil {
 		return err
@@ -145,7 +146,7 @@ func (m Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddy
 }
 
 // Unmarshal Caddyfile implements caddyfile.Unmarshaler.
-func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+func (m *Coraza) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	if !d.Next() {
 		return d.Err("expected token following filter")
 	}
@@ -171,7 +172,7 @@ func (m *Middleware) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 
 // parseCaddyfile unmarshals tokens from h into a new Middleware.
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	var m Middleware
+	var m Coraza
 	err := m.UnmarshalCaddyfile(h.Dispenser)
 	return m, err
 }
@@ -221,8 +222,8 @@ func interrupt(err error, tx *coraza.Transaction) error {
 
 // Interface guards
 var (
-	_ caddy.Provisioner           = (*Middleware)(nil)
-	_ caddy.Validator             = (*Middleware)(nil)
-	_ caddyhttp.MiddlewareHandler = (*Middleware)(nil)
-	_ caddyfile.Unmarshaler       = (*Middleware)(nil)
+	_ caddy.Provisioner           = (*Coraza)(nil)
+	_ caddy.Validator             = (*Coraza)(nil)
+	_ caddyhttp.MiddlewareHandler = (*Coraza)(nil)
+	_ caddyfile.Unmarshaler       = (*Coraza)(nil)
 )
