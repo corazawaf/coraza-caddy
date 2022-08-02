@@ -9,9 +9,8 @@
 OWASP Coraza WAF is 100% compatible with OWASP Coreruleset and Modsecurity syntax.
 ## Plugin syntax
 
-Important: `order coraza_waf first` must be always included in your Caddyfile for Coraza module to work
 ```
-coraza {
+coraza_waf {
 	directives `
 		SecAction "id:1,pass,log"
 	`
@@ -19,7 +18,8 @@ coraza {
 }
 ```
 
-Sample usage:
+Sample usage:  
+Important: `order coraza_waf first` must be always included in your Caddyfile for Coraza module to work
 
 ```
 {
