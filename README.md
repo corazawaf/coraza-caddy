@@ -61,7 +61,7 @@ $ go test ./...`
 
 ## Using OWASP Core Ruleset
 
-Clone the coreruleset repository and download the default coraza configurations from [Coraza repository](https://raw.githubusercontent.com/corazawaf/coraza/v2/master/coraza.conf-recommended), then add the following to you coraza_waf directive:
+Clone the [coreruleset repository](https://github.com/coreruleset/coreruleset) and download the default coraza configurations from [Coraza repository](https://raw.githubusercontent.com/corazawaf/coraza/v2/master/coraza.conf-recommended), then add the following to you coraza_waf directive:
 
 ```
 include caddypath/coraza.conf-recommended
