@@ -15,6 +15,7 @@
 package coraza
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,9 +26,10 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/corazawaf/coraza/v2"
-	"github.com/corazawaf/coraza/v2/seclang"
-	"github.com/corazawaf/coraza/v2/types"
+	"github.com/corazawaf/coraza/v3"
+	coraza_http "github.com/corazawaf/coraza/v3/http"
+	"github.com/corazawaf/coraza/v3/seclang"
+	"github.com/corazawaf/coraza/v3/types"
 	"go.uber.org/zap"
 )
 
@@ -100,12 +102,12 @@ func (m *Coraza) Validate() error {
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m Coraza) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	var err error
-	tx := m.waf.NewTransaction()
+	tx := m.waf.NewTransaction(context.Background())
 	defer tx.ProcessLogging()
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
 	repl.Set("http.transaction_id", tx.ID)
 
-	it, err := tx.ProcessRequest(r)
+	it, err := coraza_http.ProcessRequest(tx, r)
 	if err != nil {
 		return err
 	}
@@ -178,7 +180,7 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 }
 
 func logger(logger *zap.Logger) coraza.ErrorLogCallback {
-	return func(mr coraza.MatchedRule) {
+	return func(mr types.MatchedRule) {
 		data := mr.ErrorLog(403)
 		switch mr.Rule.Severity {
 		case types.RuleSeverityEmergency:
