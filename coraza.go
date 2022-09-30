@@ -103,7 +103,10 @@ func (m *Coraza) Validate() error {
 func (m Coraza) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	var err error
 	tx := m.waf.NewTransaction(context.Background())
-	defer tx.ProcessLogging()
+	defer func() {
+		tx.ProcessLogging()
+		_ = tx.Clean()
+	}()
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
 	repl.Set("http.transaction_id", tx.ID)
 
