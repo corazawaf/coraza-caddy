@@ -27,8 +27,6 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/corazawaf/coraza/v3"
-	coraza_http "github.com/corazawaf/coraza/v3/http"
-	"github.com/corazawaf/coraza/v3/seclang"
 	"github.com/corazawaf/coraza/v3/types"
 	"go.uber.org/zap"
 )
@@ -44,7 +42,7 @@ type Coraza struct {
 	Directives string   `json:"directives"`
 
 	logger *zap.Logger
-	waf    *coraza.Waf
+	waf    coraza.WAF
 }
 
 // CaddyModule returns the Caddy module information.
@@ -59,13 +57,9 @@ func (Coraza) CaddyModule() caddy.ModuleInfo {
 func (m *Coraza) Provision(ctx caddy.Context) error {
 	var err error
 	m.logger = ctx.Logger(m)
-	m.waf = coraza.NewWaf()
-	m.waf.SetErrorLogCb(logger(m.logger))
-	pp, _ := seclang.NewParser(m.waf)
+	wconfig := coraza.NewWAFConfig()
 	if m.Directives != "" {
-		if err = pp.FromString(m.Directives); err != nil {
-			return err
-		}
+		wconfig = wconfig.WithDirectives(m.Directives)
 	}
 	m.logger.Debug("Preparing to include files", zap.Int("count", len(m.Include)), zap.Strings("files", m.Include))
 	if len(m.Include) > 0 {
@@ -79,17 +73,17 @@ func (m *Coraza) Provision(ctx caddy.Context) error {
 				}
 				m.logger.Debug("Glob expanded", zap.String("pattern", file), zap.Strings("files", fs))
 				for _, f := range fs {
-					if err := pp.FromFile(f); err != nil {
-						return err
-					}
+					wconfig = wconfig.WithDirectivesFromFile(f)
 				}
 			} else {
 				m.logger.Debug("File was not a pattern, compiling it", zap.String("file", file))
-				if err := pp.FromFile(file); err != nil {
-					return err
-				}
+				wconfig = wconfig.WithDirectivesFromFile(file)
 			}
 		}
+	}
+	m.waf, err = coraza.NewWAF(wconfig)
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -103,11 +97,14 @@ func (m *Coraza) Validate() error {
 func (m Coraza) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	var err error
 	tx := m.waf.NewTransaction(context.Background())
-	defer tx.ProcessLogging()
-	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
-	repl.Set("http.transaction_id", tx.ID)
+	defer func() {
+		tx.ProcessLogging()
+		tx.Close()
+	}()
+	// TODO repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
+	// TODO repl.Set("http.transaction_id", tx.GetID())
 
-	it, err := coraza_http.ProcessRequest(tx, r)
+	it, err := m.ProcessRequest(tx, r)
 	if err != nil {
 		return err
 	}
@@ -115,19 +112,18 @@ func (m Coraza) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp
 		return interrupt(nil, tx)
 	}
 
-	// TODO this is a temporal fix while I fix it in coraza
-	re, err := tx.RequestBodyBuffer.Reader()
+	br, err := tx.RequestBodyReader()
 	if err != nil {
 		return err
 	}
-	r.Body = io.NopCloser(re)
+	r.Body = io.NopCloser(br)
 	rec := newStreamRecorder(w, tx)
 	err = next.ServeHTTP(rec, r)
 	if err != nil {
 		return err
 	}
 	// If the response was interrupted during phase 3 or 4 we can stop the response
-	if tx.Interruption != nil {
+	if tx.GetInterruption() != nil {
 		return interrupt(nil, tx)
 	}
 	if !rec.Buffered() {
@@ -203,22 +199,22 @@ func logger(logger *zap.Logger) coraza.ErrorLogCallback {
 	}
 }
 
-func interrupt(err error, tx *coraza.Transaction) error {
-	if tx.Interruption == nil {
+func interrupt(err error, tx types.Transaction) error {
+	if tx.GetInterruption() == nil {
 		return caddyhttp.HandlerError{
 			StatusCode: 500,
-			ID:         tx.ID,
-			Err:        err,
+			// ID:         tx.ID,
+			Err: err,
 		}
 	}
-	status := tx.Interruption.Status
+	status := tx.GetInterruption().Status
 	if status <= 0 {
 		status = 403
 	}
 	return caddyhttp.HandlerError{
 		StatusCode: status,
-		ID:         tx.ID,
-		Err:        err,
+		// ID:         tx.ID,
+		Err: err,
 	}
 }
 
