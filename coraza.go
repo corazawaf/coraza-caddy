@@ -26,10 +26,10 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/corazawaf/coraza/v3"
-	coraza_http "github.com/corazawaf/coraza/v3/http"
-	"github.com/corazawaf/coraza/v3/seclang"
-	"github.com/corazawaf/coraza/v3/types"
+	"github.com/fuomag9/coraza/v3"
+	coraza_http "github.com/fuomag9/coraza/v3/http"
+	"github.com/fuomag9/coraza/v3/seclang"
+	"github.com/fuomag9/coraza/v3/types"
 	"go.uber.org/zap"
 )
 
