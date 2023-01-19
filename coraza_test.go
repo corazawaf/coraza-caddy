@@ -1,4 +1,4 @@
-// Copyright 2022 Juan Pablo Tosso and the OWASP Coraza contributors.
+// Copyright 2023 Juan Pablo Tosso and the OWASP Coraza contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,21 +32,21 @@ import (
 const baseURL = "http://127.0.0.1:8080"
 
 func TestPlugin(t *testing.T) {
-	tester, err := newTester("test/caddyfile", t)
+	tester, err := newTester("test.init.config", t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	tester.AssertGetResponse(baseURL+"/test", 200, "test123")
-	//	if len(res.Header.Get("x-unique-id")) == 0 {
-	//		t.Error("X-Unique-Id header is not set")
-	//	}
+	res, _ := tester.AssertGetResponse(baseURL+"/test", 200, "test123")
+	if len(res.Header.Get("x-unique-id")) == 0 {
+		t.Error("X-Unique-Id header is not set")
+	}
 
 	time.Sleep(1 * time.Second)
 }
 
 func TestPluginReload(t *testing.T) {
 	tester := caddytest.NewTester(t)
-	configFile := "test/caddyfile"
+	configFile := "test.init.config"
 	configContent, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		t.Fatalf("Failed to load configuration file %s: %s", configFile, err)
@@ -62,7 +62,7 @@ func TestPluginReload(t *testing.T) {
 }
 
 func TestSimpleRule(t *testing.T) {
-	tester, err := newTester("test/caddyfile", t)
+	tester, err := newTester("test.init.config", t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestSimpleRule(t *testing.T) {
 }
 
 func TestPhase3Disruption(t *testing.T) {
-	tester, err := newTester("test/caddyfile", t)
+	tester, err := newTester("test.init.config", t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestPhase3Disruption(t *testing.T) {
 }
 
 func TestPostUrlEncoded(t *testing.T) {
-	tester, err := newTester("test/caddyfile", t)
+	tester, err := newTester("test.init.config", t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestPostUrlEncoded(t *testing.T) {
 }
 
 func TestPostMultipart(t *testing.T) {
-	tester, err := newTester("test/caddyfile", t)
+	tester, err := newTester("test.init.config", t)
 	if err != nil {
 		t.Fatal(err)
 	}
