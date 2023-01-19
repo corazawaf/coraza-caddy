@@ -31,12 +31,12 @@ import (
 )
 
 func init() {
-	caddy.RegisterModule(Coraza{})
+	caddy.RegisterModule(corazaModule{})
 	httpcaddyfile.RegisterHandlerDirective("coraza_waf", parseCaddyfile)
 }
 
-// Coraza is a Web Application Firewall implementation for Caddy.
-type Coraza struct {
+// corazaModule is a Web Application Firewall implementation for Caddy.
+type corazaModule struct {
 	Include    []string `json:"include"`
 	Directives string   `json:"directives"`
 
@@ -45,15 +45,15 @@ type Coraza struct {
 }
 
 // CaddyModule returns the Caddy module information.
-func (Coraza) CaddyModule() caddy.ModuleInfo {
+func (corazaModule) CaddyModule() caddy.ModuleInfo {
 	return caddy.ModuleInfo{
 		ID:  "http.handlers.waf",
-		New: func() caddy.Module { return new(Coraza) },
+		New: func() caddy.Module { return new(corazaModule) },
 	}
 }
 
 // Provision implements caddy.Provisioner.
-func (m *Coraza) Provision(ctx caddy.Context) error {
+func (m *corazaModule) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger(m)
 	config := coraza.NewWAFConfig().WithErrorCallback(logger(m.logger))
 	if m.Directives != "" {
@@ -85,12 +85,12 @@ func (m *Coraza) Provision(ctx caddy.Context) error {
 }
 
 // Validate implements caddy.Validator.
-func (m *Coraza) Validate() error {
+func (m *corazaModule) Validate() error {
 	return nil
 }
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
-func (m Coraza) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
+func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	var err error
 	id := randomString(16)
 	tx := m.waf.NewTransactionWithID(id)
@@ -136,7 +136,7 @@ func (m Coraza) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp
 }
 
 // Unmarshal Caddyfile implements caddyfile.Unmarshaler.
-func (m *Coraza) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
+func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	if !d.Next() {
 		return d.Err("expected token following filter")
 	}
@@ -162,7 +162,7 @@ func (m *Coraza) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 
 // parseCaddyfile unmarshals tokens from h into a new Middleware.
 func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error) {
-	var m Coraza
+	var m corazaModule
 	err := m.UnmarshalCaddyfile(h.Dispenser)
 	return m, err
 }
@@ -212,8 +212,8 @@ func interrupt(err error, tx types.Transaction, id string) error {
 
 // Interface guards
 var (
-	_ caddy.Provisioner           = (*Coraza)(nil)
-	_ caddy.Validator             = (*Coraza)(nil)
-	_ caddyhttp.MiddlewareHandler = (*Coraza)(nil)
-	_ caddyfile.Unmarshaler       = (*Coraza)(nil)
+	_ caddy.Provisioner           = (*corazaModule)(nil)
+	_ caddy.Validator             = (*corazaModule)(nil)
+	_ caddyhttp.MiddlewareHandler = (*corazaModule)(nil)
+	_ caddyfile.Unmarshaler       = (*corazaModule)(nil)
 )
