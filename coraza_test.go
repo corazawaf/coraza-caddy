@@ -32,7 +32,7 @@ import (
 const baseURL = "http://127.0.0.1:8080"
 
 func TestPlugin(t *testing.T) {
-	tester, err := newTester("test/caddyfile", t)
+	tester, err := newTester("test.init.config", t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestPlugin(t *testing.T) {
 
 func TestPluginReload(t *testing.T) {
 	tester := caddytest.NewTester(t)
-	configFile := "test/caddyfile"
+	configFile := "test.init.config"
 	configContent, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		t.Fatalf("Failed to load configuration file %s: %s", configFile, err)
@@ -62,7 +62,7 @@ func TestPluginReload(t *testing.T) {
 }
 
 func TestSimpleRule(t *testing.T) {
-	tester, err := newTester("test/caddyfile", t)
+	tester, err := newTester("test.init.config", t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestSimpleRule(t *testing.T) {
 }
 
 func TestPhase3Disruption(t *testing.T) {
-	tester, err := newTester("test/caddyfile", t)
+	tester, err := newTester("test.init.config", t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestPhase3Disruption(t *testing.T) {
 }
 
 func TestPostUrlEncoded(t *testing.T) {
-	tester, err := newTester("test/caddyfile", t)
+	tester, err := newTester("test.init.config", t)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestPostUrlEncoded(t *testing.T) {
 }
 
 func TestPostMultipart(t *testing.T) {
-	tester, err := newTester("test/caddyfile", t)
+	tester, err := newTester("test.init.config", t)
 	if err != nil {
 		t.Fatal(err)
 	}
