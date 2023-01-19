@@ -1,4 +1,4 @@
-// Copyright 2022 Juan Pablo Tosso and the OWASP Coraza contributors.
+// Copyright 2023 Juan Pablo Tosso and the OWASP Coraza contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,12 +19,12 @@ import (
 	"net/http"
 
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/types"
 )
 
 type streamRecorder struct {
 	*caddyhttp.ResponseWriterWrapper
-	transaction *coraza.Transaction
+	transaction types.Transaction
 	statusCode  int
 	wroteHeader bool
 
@@ -45,12 +45,12 @@ func (sr *streamRecorder) WriteHeader(statusCode int) {
 	}
 	sr.transaction.ProcessResponseHeaders(statusCode, "http/1.1")
 	// we take care of unwanted responses
-	if !sr.transaction.IsProcessableResponseBody() {
+	if !sr.transaction.IsResponseBodyProcessable() {
 		sr.stream = true
 	}
 	// We won't send response headers on stream if the transaction was interrupted
 	// So the module can send an error page
-	if sr.transaction.Interruption == nil && sr.stream {
+	if !sr.transaction.IsInterrupted() && sr.stream {
 		sr.ResponseWriter.WriteHeader(sr.statusCode)
 		sr.stream = false
 	}
@@ -58,7 +58,7 @@ func (sr *streamRecorder) WriteHeader(statusCode int) {
 
 func (sr *streamRecorder) Write(data []byte) (int, error) {
 	sr.WriteHeader(http.StatusOK)
-	if sr.transaction.Interruption != nil {
+	if sr.transaction.IsInterrupted() {
 		// We won't process the response body if the transaction was interrupted
 		// There must be a way to stop receiving the buffer and avoid this wasted bandwidth
 		return 0, nil
@@ -67,7 +67,7 @@ func (sr *streamRecorder) Write(data []byte) (int, error) {
 		return sr.ResponseWriterWrapper.Write(data)
 	}
 
-	return sr.transaction.ResponseBodyBuffer.Write(data)
+	return sr.transaction.ResponseBodyWriter().Write(data)
 }
 
 // Reader provides access to the buffered/inmemory response object
@@ -75,7 +75,7 @@ func (sr *streamRecorder) Reader() (io.Reader, error) {
 	if sr.stream {
 		return nil, nil
 	}
-	return sr.transaction.ResponseBodyBuffer.Reader()
+	return sr.transaction.ResponseBodyReader()
 }
 
 // Buffered returns true if the response is stored inside the transaction
@@ -88,7 +88,7 @@ func (sr *streamRecorder) Status() int {
 	return sr.statusCode
 }
 
-func newStreamRecorder(w http.ResponseWriter, tx *coraza.Transaction) *streamRecorder {
+func newStreamRecorder(w http.ResponseWriter, tx types.Transaction) *streamRecorder {
 	return &streamRecorder{
 		ResponseWriterWrapper: &caddyhttp.ResponseWriterWrapper{ResponseWriter: w},
 		transaction:           tx,

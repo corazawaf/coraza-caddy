@@ -1,4 +1,4 @@
-// Copyright 2022 Juan Pablo Tosso and the OWASP Coraza contributors.
+// Copyright 2023 Juan Pablo Tosso and the OWASP Coraza contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 package coraza
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,8 +26,6 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/corazawaf/coraza/v3"
-	coraza_http "github.com/corazawaf/coraza/v3/http"
-	"github.com/corazawaf/coraza/v3/seclang"
 	"github.com/corazawaf/coraza/v3/types"
 	"go.uber.org/zap"
 )
@@ -44,7 +41,7 @@ type Coraza struct {
 	Directives string   `json:"directives"`
 
 	logger *zap.Logger
-	waf    *coraza.Waf
+	waf    coraza.WAF
 }
 
 // CaddyModule returns the Caddy module information.
@@ -57,15 +54,10 @@ func (Coraza) CaddyModule() caddy.ModuleInfo {
 
 // Provision implements caddy.Provisioner.
 func (m *Coraza) Provision(ctx caddy.Context) error {
-	var err error
 	m.logger = ctx.Logger(m)
-	m.waf = coraza.NewWaf()
-	m.waf.SetErrorLogCb(logger(m.logger))
-	pp, _ := seclang.NewParser(m.waf)
+	config := coraza.NewWAFConfig().WithErrorCallback(logger(m.logger))
 	if m.Directives != "" {
-		if err = pp.FromString(m.Directives); err != nil {
-			return err
-		}
+		config = config.WithDirectives(m.Directives)
 	}
 	m.logger.Debug("Preparing to include files", zap.Int("count", len(m.Include)), zap.Strings("files", m.Include))
 	if len(m.Include) > 0 {
@@ -79,19 +71,17 @@ func (m *Coraza) Provision(ctx caddy.Context) error {
 				}
 				m.logger.Debug("Glob expanded", zap.String("pattern", file), zap.Strings("files", fs))
 				for _, f := range fs {
-					if err := pp.FromFile(f); err != nil {
-						return err
-					}
+					config = config.WithDirectivesFromFile(f)
 				}
 			} else {
 				m.logger.Debug("File was not a pattern, compiling it", zap.String("file", file))
-				if err := pp.FromFile(file); err != nil {
-					return err
-				}
+				config = config.WithDirectivesFromFile(file)
 			}
 		}
 	}
-	return nil
+	var err error
+	m.waf, err = coraza.NewWAF(config)
+	return err
 }
 
 // Validate implements caddy.Validator.
@@ -102,36 +92,31 @@ func (m *Coraza) Validate() error {
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m Coraza) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	var err error
-	tx := m.waf.NewTransaction(context.Background())
+	id := randomString(16)
+	tx := m.waf.NewTransactionWithID(id)
 	defer func() {
 		tx.ProcessLogging()
-		_ = tx.Clean()
+		_ = tx.Close()
 	}()
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
-	repl.Set("http.transaction_id", tx.ID)
+	repl.Set("http.transaction_id", id)
 
-	it, err := coraza_http.ProcessRequest(tx, r)
+	it, err := processRequest(tx, r)
 	if err != nil {
 		return err
 	}
 	if it != nil {
-		return interrupt(nil, tx)
+		return interrupt(nil, tx, id)
 	}
 
-	// TODO this is a temporal fix while I fix it in coraza
-	re, err := tx.RequestBodyBuffer.Reader()
-	if err != nil {
-		return err
-	}
-	r.Body = io.NopCloser(re)
 	rec := newStreamRecorder(w, tx)
 	err = next.ServeHTTP(rec, r)
 	if err != nil {
 		return err
 	}
 	// If the response was interrupted during phase 3 or 4 we can stop the response
-	if tx.Interruption != nil {
-		return interrupt(nil, tx)
+	if tx.IsInterrupted() {
+		return interrupt(nil, tx, id)
 	}
 	if !rec.Buffered() {
 		//Nothing to do, response was already sent to the client
@@ -182,10 +167,10 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	return m, err
 }
 
-func logger(logger *zap.Logger) coraza.ErrorLogCallback {
+func logger(logger *zap.Logger) func(types.MatchedRule) {
 	return func(mr types.MatchedRule) {
 		data := mr.ErrorLog(403)
-		switch mr.Rule.Severity {
+		switch mr.Rule().Severity() {
 		case types.RuleSeverityEmergency:
 			logger.Error(data)
 		case types.RuleSeverityAlert:
@@ -206,21 +191,21 @@ func logger(logger *zap.Logger) coraza.ErrorLogCallback {
 	}
 }
 
-func interrupt(err error, tx *coraza.Transaction) error {
-	if tx.Interruption == nil {
+func interrupt(err error, tx types.Transaction, id string) error {
+	if !tx.IsInterrupted() {
 		return caddyhttp.HandlerError{
 			StatusCode: 500,
-			ID:         tx.ID,
+			ID:         id,
 			Err:        err,
 		}
 	}
-	status := tx.Interruption.Status
+	status := tx.Interruption().Status
 	if status <= 0 {
 		status = 403
 	}
 	return caddyhttp.HandlerError{
 		StatusCode: status,
-		ID:         tx.ID,
+		ID:         id,
 		Err:        err,
 	}
 }

@@ -1,4 +1,4 @@
-// Copyright 2022 Juan Pablo Tosso and the OWASP Coraza contributors.
+// Copyright 2023 Juan Pablo Tosso and the OWASP Coraza contributors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,10 +36,10 @@ func TestPlugin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tester.AssertGetResponse(baseURL+"/test", 200, "test123")
-	//	if len(res.Header.Get("x-unique-id")) == 0 {
-	//		t.Error("X-Unique-Id header is not set")
-	//	}
+	res, _ := tester.AssertGetResponse(baseURL+"/test", 200, "test123")
+	if len(res.Header.Get("x-unique-id")) == 0 {
+		t.Error("X-Unique-Id header is not set")
+	}
 
 	time.Sleep(1 * time.Second)
 }
