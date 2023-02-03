@@ -24,9 +24,10 @@ import (
 	"strings"
 
 	"github.com/corazawaf/coraza/v3/types"
+	"go.uber.org/zap"
 )
 
-func processRequest(tx types.Transaction, r *http.Request) (*types.Interruption, error) {
+func processRequest(tx types.Transaction, r *http.Request, logger *zap.Logger) (*types.Interruption, error) {
 	// first we parse the r.RemoteAddr, it could be an IP or an IP:PORT or a [IP]:PORT
 	remoteAddr := r.RemoteAddr
 	remotePort := ""
@@ -46,7 +47,8 @@ func processRequest(tx types.Transaction, r *http.Request) (*types.Interruption,
 	tx.AddRequestHeader("Host", r.Host)
 	serverName, err := parseServerName(r.Host)
 	if err != nil {
-		// TODO: log a warning, parseServerName still populates serverName
+		// Even if an error is raised, serverName is still populated
+		logger.Debug("Failed to parse server name from host", zap.String("host", r.Host), zap.Error(err))
 	}
 	tx.SetServerName(serverName)
 	if it := tx.ProcessRequestHeaders(); it != nil {
