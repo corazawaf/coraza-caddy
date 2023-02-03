@@ -15,6 +15,7 @@
 package coraza
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -43,6 +44,11 @@ func processRequest(tx types.Transaction, r *http.Request) (*types.Interruption,
 		tx.AddRequestHeader(k, v[0])
 	}
 	tx.AddRequestHeader("Host", r.Host)
+	serverName, err := parseServerName(r.Host)
+	if err != nil {
+		// TODO: log a warning, parseServerName still populates serverName
+	}
+	tx.SetServerName(serverName)
 	if it := tx.ProcessRequestHeaders(); it != nil {
 		return it, nil
 	}
@@ -84,4 +90,16 @@ func processRequest(tx types.Transaction, r *http.Request) (*types.Interruption,
 		}
 	}
 	return tx.ProcessRequestBody()
+}
+
+// parseServerName parses r.Host in order to retrieve the virtual host.
+func parseServerName(host string) (string, error) {
+	serverName, _, err := net.SplitHostPort(host)
+	if err != nil {
+		// missing port or bad format
+		err = errors.New(fmt.Sprintf("failed to parse server name from authority %q, %v", host, err))
+		serverName = host
+	}
+	// anyways serverName is returned
+	return serverName, err
 }

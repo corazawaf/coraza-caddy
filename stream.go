@@ -15,6 +15,7 @@
 package coraza
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 
@@ -67,7 +68,16 @@ func (sr *streamRecorder) Write(data []byte) (int, error) {
 		return sr.ResponseWriterWrapper.Write(data)
 	}
 
-	return sr.transaction.ResponseBodyWriter().Write(data)
+	interruption, n, err := sr.transaction.WriteResponseBody(data)
+	if err != nil {
+		return 0, fmt.Errorf("failed to append response body: %s", err.Error())
+	}
+	if interruption != nil {
+		// Interruption raised while appending response body (e.g. limit reached)
+		return 0, nil
+	}
+
+	return n, err
 }
 
 // Reader provides access to the buffered/inmemory response object
