@@ -101,7 +101,7 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
 	repl.Set("http.transaction_id", id)
 
-	it, err := processRequest(tx, r)
+	it, err := processRequest(tx, r, m.logger)
 	if err != nil {
 		return err
 	}

@@ -125,6 +125,8 @@ github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:z
 github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
 github.com/corazawaf/coraza/v3 v3.0.0-20230117071831-8b909c7fc345 h1:4xW94n5Lah6ca8ROtP1g9fhVHc8RW5IyMnLVp3uzkUo=
 github.com/corazawaf/coraza/v3 v3.0.0-20230117071831-8b909c7fc345/go.mod h1:kLh41mCKAXAX7e/Rv3LijMyHObu3B6IbdcflFarf858=
+github.com/corazawaf/coraza/v3 v3.0.0-20230203020113-719e7edfc0ac h1:7Z7S20RGR6kZNBjjhP0bPWdgVQuF1XqNIxxl9myBt/o=
+github.com/corazawaf/coraza/v3 v3.0.0-20230203020113-719e7edfc0ac/go.mod h1:dXFswKzaDVm4SsHAyvi12A4yLfg2bVx/myCBkyGALGU=
 github.com/corazawaf/libinjection-go v0.1.2 h1:oeiV9pc5rvJ+2oqOqXEAMJousPpGiup6f7Y3nZj5GoM=
 github.com/corazawaf/libinjection-go v0.1.2/go.mod h1:OP4TM7xdJ2skyXqNX1AN1wN5nNZEmJNuWbNPOItn7aw=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=

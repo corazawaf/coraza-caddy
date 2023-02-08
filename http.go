@@ -15,6 +15,7 @@
 package coraza
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -23,9 +24,10 @@ import (
 	"strings"
 
 	"github.com/corazawaf/coraza/v3/types"
+	"go.uber.org/zap"
 )
 
-func processRequest(tx types.Transaction, r *http.Request) (*types.Interruption, error) {
+func processRequest(tx types.Transaction, r *http.Request, logger *zap.Logger) (*types.Interruption, error) {
 	// first we parse the r.RemoteAddr, it could be an IP or an IP:PORT or a [IP]:PORT
 	remoteAddr := r.RemoteAddr
 	remotePort := ""
@@ -43,6 +45,12 @@ func processRequest(tx types.Transaction, r *http.Request) (*types.Interruption,
 		tx.AddRequestHeader(k, v[0])
 	}
 	tx.AddRequestHeader("Host", r.Host)
+	serverName, err := parseServerName(r.Host)
+	if err != nil {
+		// Even if an error is raised, serverName is still populated
+		logger.Debug("Failed to parse server name from host", zap.String("host", r.Host), zap.Error(err))
+	}
+	tx.SetServerName(serverName)
 	if it := tx.ProcessRequestHeaders(); it != nil {
 		return it, nil
 	}
@@ -84,4 +92,16 @@ func processRequest(tx types.Transaction, r *http.Request) (*types.Interruption,
 		}
 	}
 	return tx.ProcessRequestBody()
+}
+
+// parseServerName parses r.Host in order to retrieve the virtual host.
+func parseServerName(host string) (string, error) {
+	serverName, _, err := net.SplitHostPort(host)
+	if err != nil {
+		// missing port or bad format
+		err = errors.New(fmt.Sprintf("failed to parse server name from authority %q, %v", host, err))
+		serverName = host
+	}
+	// anyways serverName is returned
+	return serverName, err
 }
