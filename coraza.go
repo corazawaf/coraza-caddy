@@ -108,7 +108,7 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 		return interrupt(nil, tx, id)
 	}
 	if !rec.Buffered() {
-		//Nothing to do, response was already sent to the client
+		// Nothing to do, response was already sent to the client
 		return nil
 	}
 
