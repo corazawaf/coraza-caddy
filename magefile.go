@@ -1,4 +1,4 @@
-// Copyright 2022 The OWASP Coraza contributors
+// Copyright 2023 The OWASP Coraza contributors
 // SPDX-License-Identifier: Apache-2.0
 
 //go:build mage
@@ -36,8 +36,7 @@ func Format() error {
 		"-c", "The OWASP Coraza contributors",
 		"-s=only",
 		"-ignore", "**/*.yml",
-		"-ignore", "**/*.yaml",
-		"-ignore", "examples/**", "."); err != nil {
+		"-ignore", "**/*.yaml", "."); err != nil {
 		return err
 	}
 	return sh.RunV("go", "run", fmt.Sprintf("github.com/rinchsan/gosimports/cmd/gosimports@%s", gosImportsVer),
