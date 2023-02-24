@@ -1,0 +1,24 @@
+run:
+  deadline: 5m
+
+linters:
+  disable-all: true
+  enable:
+    # Enabled by default, see https://golangci-lint.run/usage/linters#enabled-by-default
+    - deadcode
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    - varcheck
+    - goimports
+    - gofmt
+    - gocritic
+issues:
+  exclude-rules:
+    - path: magefile\.go
+      linters:
+        - deadcode

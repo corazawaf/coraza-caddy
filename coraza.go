@@ -1,21 +1,9 @@
-// Copyright 2023 Juan Pablo Tosso and the OWASP Coraza contributors.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2023 The OWASP Coraza contributors
+// SPDX-License-Identifier: Apache-2.0
 
 package coraza
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -119,7 +107,7 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 		return interrupt(nil, tx, id)
 	}
 	if !rec.Buffered() {
-		//Nothing to do, response was already sent to the client
+		// Nothing to do, response was already sent to the client
 		return nil
 	}
 
@@ -154,7 +142,7 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		case "directives":
 			m.Directives = value
 		default:
-			return d.Err(fmt.Sprintf("invalid key for filter directive: %s", key))
+			return d.Errf("invalid key for filter directive: %s", key)
 		}
 	}
 	return nil
