@@ -4,7 +4,6 @@
 package coraza
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -143,7 +142,7 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		case "directives":
 			m.Directives = value
 		default:
-			return d.Err(fmt.Sprintf("invalid key for filter directive: %s", key))
+			return d.Errf("invalid key for filter directive: %s", key)
 		}
 	}
 	return nil
