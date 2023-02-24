@@ -76,6 +76,13 @@ func Test() error {
 }
 
 func Coverage() error {
+	if err := os.MkdirAll("build", 0755); err != nil {
+		return err
+	}
+	if err := sh.RunV("go", "test", "-race", "-coverprofile=build/coverage.txt", "-covermode=atomic", "-coverpkg=./...", "./..."); err != nil {
+		return err
+	}
+
 	return sh.RunV("go", "tool", "cover", "-html=build/coverage.txt", "-o", "build/coverage.html")
 }
 
