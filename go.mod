@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/caddyserver/caddy/v2 v2.6.2
 	github.com/corazawaf/coraza/v3 v3.0.0-20230222164726-1ac270a3257d
+	github.com/magefile/mage v1.14.0
 	go.uber.org/zap v1.24.0
 )
 
@@ -62,7 +63,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.1.1 // indirect
 	github.com/libdns/libdns v0.2.1 // indirect
 	github.com/lucas-clemente/quic-go v0.29.2 // indirect
-	github.com/magefile/mage v1.14.0 // indirect
 	github.com/manifoldco/promptui v0.9.0 // indirect
 	github.com/marten-seemann/qpack v0.2.1 // indirect
 	github.com/marten-seemann/qtls-go1-18 v0.1.3 // indirect

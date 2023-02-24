@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -47,7 +46,7 @@ func TestPlugin(t *testing.T) {
 func TestPluginReload(t *testing.T) {
 	tester := caddytest.NewTester(t)
 	configFile := "test.init.config"
-	configContent, err := ioutil.ReadFile(configFile)
+	configContent, err := os.ReadFile(configFile)
 	if err != nil {
 		t.Fatalf("Failed to load configuration file %s: %s", configFile, err)
 	}
@@ -130,7 +129,9 @@ func multipartRequest(req *http.Request) error {
 	defer os.Remove(tempfile.Name())
 	for i := 0; i < 1024*5; i++ {
 		// this should create a 5mb file
-		tempfile.Write([]byte(strings.Repeat("A", 1024)))
+		if _, err := tempfile.Write([]byte(strings.Repeat("A", 1024))); err != nil {
+			return err
+		}
 	}
 	var fw io.Writer
 	if fw, err = w.CreateFormFile("fupload", tempfile.Name()); err != nil {
@@ -142,7 +143,7 @@ func multipartRequest(req *http.Request) error {
 	if _, err = io.Copy(fw, tempfile); err != nil {
 		return err
 	}
-	req.Body = ioutil.NopCloser(&b)
+	req.Body = io.NopCloser(&b)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	req.Method = "POST"
 	return nil
@@ -150,7 +151,7 @@ func multipartRequest(req *http.Request) error {
 
 func newTester(caddyfile string, t *testing.T) (*caddytest.Tester, error) {
 	tester := caddytest.NewTester(t)
-	configContent, err := ioutil.ReadFile(caddyfile)
+	configContent, err := os.ReadFile(caddyfile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration file %s: %s", caddyfile, err)
 	}

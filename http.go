@@ -15,7 +15,6 @@
 package coraza
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -99,7 +98,7 @@ func parseServerName(host string) (string, error) {
 	serverName, _, err := net.SplitHostPort(host)
 	if err != nil {
 		// missing port or bad format
-		err = errors.New(fmt.Sprintf("failed to parse server name from authority %q, %v", host, err))
+		err = fmt.Errorf("failed to parse server name from authority %q, %v", host, err)
 		serverName = host
 	}
 	// anyways serverName is returned

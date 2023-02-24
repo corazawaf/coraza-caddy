@@ -30,5 +30,7 @@ jobs:
         with:
           lfs: true
           fetch-depth: 0 #for better blame info
+      - name: Lint
+        run: go run mage.go lint
       - name: Tests and coverage
         run: go run mage.go coverage
