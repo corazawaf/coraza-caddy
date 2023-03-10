@@ -47,8 +47,9 @@ func (m *corazaModule) Provision(ctx caddy.Context) error {
 	if m.Directives != "" {
 		config = config.WithDirectives(m.Directives)
 	}
-	m.logger.Debug("Preparing to include files", zap.Int("count", len(m.Include)), zap.Strings("files", m.Include))
+
 	if len(m.Include) > 0 {
+		// TODO(jcchavezs): deprecate this in favor of directives.
 		for _, file := range m.Include {
 			if strings.Contains(file, "*") {
 				m.logger.Debug("Preparing to expand glob", zap.String("pattern", file))
@@ -80,21 +81,20 @@ func (m *corazaModule) Validate() error {
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	var err error
-	id := randomString(16)
-	tx := m.waf.NewTransactionWithID(id)
+	tx := m.waf.NewTransaction()
 	defer func() {
 		tx.ProcessLogging()
 		_ = tx.Close()
 	}()
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
-	repl.Set("http.transaction_id", id)
+	repl.Set("http.transaction_id", tx.ID())
 
 	it, err := processRequest(tx, r, m.logger)
 	if err != nil {
 		return err
 	}
 	if it != nil {
-		return interrupt(nil, tx, id)
+		return interrupt(nil, tx, tx.ID())
 	}
 
 	rec := newStreamRecorder(w, tx)
@@ -104,7 +104,7 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	}
 	// If the response was interrupted during phase 3 or 4 we can stop the response
 	if tx.IsInterrupted() {
-		return interrupt(nil, tx, id)
+		return interrupt(nil, tx, tx.ID())
 	}
 	if !rec.Buffered() {
 		// Nothing to do, response was already sent to the client
