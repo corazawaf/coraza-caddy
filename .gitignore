@@ -7,3 +7,5 @@ vendor/
 .DS_Store
 __debug*
 .idea/
+
+build

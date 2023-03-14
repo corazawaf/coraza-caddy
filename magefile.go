@@ -104,3 +104,23 @@ func Precommit() error {
 func Check() {
 	mg.SerialDeps(Lint, Test)
 }
+
+func Build() error {
+	return build("")
+}
+
+func BuildLinux() error {
+	return build("linux")
+}
+
+func build(goos string) error {
+	env := map[string]string{}
+	buildDir := "build/caddy"
+	if goos != "" {
+		env["GOOS"] = goos
+		buildDir = fmt.Sprintf("%s-%s", buildDir, goos)
+	}
+	return sh.RunWithV(env, "xcaddy", "build",
+		"--with", "github.com/corazawaf/coraza-caddy=.",
+		"--output", buildDir)
+}
