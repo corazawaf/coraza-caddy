@@ -125,8 +125,8 @@ github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:z
 github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
 github.com/corazawaf/coraza-coreruleset v0.0.0-20230313182618-4e081de217cb h1:oTPsaA/dCsrRHm8p6zhHH6ixEPJC3WDmpitNpPMb/KY=
 github.com/corazawaf/coraza-coreruleset v0.0.0-20230313182618-4e081de217cb/go.mod h1:h7fBXlh00atH/uVC9Lpjawg/RlJCsHjvyVk+bP3ylq8=
-github.com/corazawaf/coraza/v3 v3.0.0-20230312191952-69e0f92fe572 h1:t2rktuRpjMjj1R66d+XUumqKt/7mrCyVk9Ttsgna/mU=
-github.com/corazawaf/coraza/v3 v3.0.0-20230312191952-69e0f92fe572/go.mod h1:GhpyYpKaOG/wHZtdyUpu74wo9StS3fzmtKvgSzms/XQ=
+github.com/corazawaf/coraza/v3 v3.0.0-rc.1.0.20230329004849-daf3747c8c45 h1:ROPaiSu+KA0Z4/dgUbvLVi6VCSKa/98PB78fh5WZpxI=
+github.com/corazawaf/coraza/v3 v3.0.0-rc.1.0.20230329004849-daf3747c8c45/go.mod h1:BKoHfX9ElA9uw7GBtKisLYM1snL2TRnA55GTA+Z/4ow=
 github.com/corazawaf/libinjection-go v0.1.2 h1:oeiV9pc5rvJ+2oqOqXEAMJousPpGiup6f7Y3nZj5GoM=
 github.com/corazawaf/libinjection-go v0.1.2/go.mod h1:OP4TM7xdJ2skyXqNX1AN1wN5nNZEmJNuWbNPOItn7aw=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
@@ -1159,6 +1159,7 @@ honnef.co/go/tools v0.0.1-2020.1.4/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9
 howett.net/plist v0.0.0-20181124034731-591f970eefbb/go.mod h1:vMygbs4qMhSZSc4lCUl2OEE+rDiIIJAIdR4m7MiMcm0=
 howett.net/plist v1.0.0 h1:7CrbWYbPPO/PyNy38b2EB/+gYbjCe2DXBxgtOOZbSQM=
 howett.net/plist v1.0.0/go.mod h1:lqaXoTrLY4hg8tnEzNru53gicrbv7rrk+2xJA/7hw9g=
+rsc.io/binaryregexp v0.2.0 h1:HfqmD5MEmC0zvwBuF187nq9mdnXjXsSivRiXN7SmRkE=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=
 rsc.io/sampler v1.3.0/go.mod h1:T1hPZKmBbMNahiBKFy5HrXp6adAjACjK9JXDnKaTXpA=
