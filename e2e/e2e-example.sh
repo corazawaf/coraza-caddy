@@ -1,6 +1,7 @@
 #!/bin/bash
 # Copyright 2022 The OWASP Coraza contributors
 # SPDX-License-Identifier: Apache-2.0
+# Copied from https://github.com/corazawaf/coraza-proxy-wasm/tree/main/e2e
 ENVOY_HOST=${ENVOY_HOST:-"localhost:8080"}
 HTTPBIN_HOST=${HTTPBIN_HOST:-"localhost:8081"}
 TIMEOUT_SECS=${TIMEOUT_SECS:-5}
