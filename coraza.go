@@ -4,7 +4,6 @@
 package coraza
 
 import (
-	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -13,8 +12,11 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	coreruleset "github.com/corazawaf/coraza-coreruleset"
+	"github.com/corazawaf/coraza-coreruleset/io"
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
+	"github.com/yalue/merged_fs"
 	"go.uber.org/zap"
 )
 
@@ -43,10 +45,15 @@ func (corazaModule) CaddyModule() caddy.ModuleInfo {
 // Provision implements caddy.Provisioner.
 func (m *corazaModule) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger(m)
-	config := coraza.NewWAFConfig().WithErrorCallback(logger(m.logger))
+
+	config := coraza.NewWAFConfig().
+		WithErrorCallback(logger(m.logger)).
+		WithRootFS(merged_fs.NewMergedFS(coreruleset.FS, io.OSFS))
+
 	if m.Directives != "" {
 		config = config.WithDirectives(m.Directives)
 	}
+
 	m.logger.Debug("Preparing to include files", zap.Int("count", len(m.Include)), zap.Strings("files", m.Include))
 	if len(m.Include) > 0 {
 		for _, file := range m.Include {
@@ -67,6 +74,7 @@ func (m *corazaModule) Provision(ctx caddy.Context) error {
 			}
 		}
 	}
+
 	var err error
 	m.waf, err = coraza.NewWAF(config)
 	return err
@@ -79,48 +87,57 @@ func (m *corazaModule) Validate() error {
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	var err error
 	id := randomString(16)
 	tx := m.waf.NewTransactionWithID(id)
 	defer func() {
 		tx.ProcessLogging()
 		_ = tx.Close()
 	}()
+
+	// Early return, Coraza is not going to process any rule
+	if tx.IsRuleEngineOff() {
+		// response writer is not going to be wrapped, but used as-is
+		// to generate the response
+		return next.ServeHTTP(w, r)
+	}
+
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
 	repl.Set("http.transaction_id", id)
 
-	it, err := processRequest(tx, r, m.logger)
-	if err != nil {
-		return err
-	}
-	if it != nil {
-		return interrupt(nil, tx, id)
-	}
-
-	rec := newStreamRecorder(w, tx)
-	err = next.ServeHTTP(rec, r)
-	if err != nil {
-		return err
-	}
-	// If the response was interrupted during phase 3 or 4 we can stop the response
-	if tx.IsInterrupted() {
-		return interrupt(nil, tx, id)
-	}
-	if !rec.Buffered() {
-		// Nothing to do, response was already sent to the client
+	// ProcessRequest is just a wrapper around ProcessConnection, ProcessURI,
+	// ProcessRequestHeaders and ProcessRequestBody.
+	// It fails if any of these functions returns an error and it stops on interruption.
+	if it, err := processRequest(tx, r); err != nil {
+		return caddyhttp.HandlerError{
+			StatusCode: 500,
+			ID:         tx.ID(),
+			Err:        err,
+		}
+	} else if it != nil {
+		w.WriteHeader(obtainStatusCodeFromInterruptionOrDefault(it, http.StatusOK))
 		return nil
 	}
 
-	if status := rec.Status(); status > 0 {
-		w.WriteHeader(status)
+	ww, processResponse := wrap(w, r, tx)
+
+	// We continue with the other middlewares by catching the response
+	if err := next.ServeHTTP(ww, r); err != nil {
+		return caddyhttp.HandlerError{
+			StatusCode: 500,
+			ID:         tx.ID(),
+			Err:        err,
+		}
 	}
-	// We will send the response provided by Coraza
-	reader, err := rec.Reader()
-	if err != nil {
-		return err
+
+	if err := processResponse(tx, r); err != nil {
+		return caddyhttp.HandlerError{
+			StatusCode: 500,
+			ID:         tx.ID(),
+			Err:        err,
+		}
 	}
-	_, err = io.Copy(w, reader)
-	return err
+
+	return nil
 }
 
 // Unmarshal Caddyfile implements caddyfile.Unmarshaler.
@@ -176,25 +193,6 @@ func logger(logger *zap.Logger) func(types.MatchedRule) {
 		case types.RuleSeverityDebug:
 			logger.Debug(data)
 		}
-	}
-}
-
-func interrupt(err error, tx types.Transaction, id string) error {
-	if !tx.IsInterrupted() {
-		return caddyhttp.HandlerError{
-			StatusCode: 500,
-			ID:         id,
-			Err:        err,
-		}
-	}
-	status := tx.Interruption().Status
-	if status <= 0 {
-		status = 403
-	}
-	return caddyhttp.HandlerError{
-		StatusCode: status,
-		ID:         id,
-		Err:        err,
 	}
 }
 

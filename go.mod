@@ -4,8 +4,10 @@ go 1.18
 
 require (
 	github.com/caddyserver/caddy/v2 v2.6.2
-	github.com/corazawaf/coraza/v3 v3.0.0-20230222164726-1ac270a3257d
+	github.com/corazawaf/coraza-coreruleset v0.0.0-20230313182618-4e081de217cb
+	github.com/corazawaf/coraza/v3 v3.0.0-rc.1.0.20230329004849-daf3747c8c45
 	github.com/magefile/mage v1.14.0
+	github.com/yalue/merged_fs v1.2.3
 	go.uber.org/zap v1.24.0
 )
 
@@ -124,12 +126,12 @@ require (
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
-	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
-	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/term v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
-	golang.org/x/tools v0.1.12 // indirect
+	golang.org/x/mod v0.8.0 // indirect
+	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/term v0.6.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
+	golang.org/x/tools v0.6.0 // indirect
 	google.golang.org/genproto v0.0.0-20220617124728-180714bec0ad // indirect
 	google.golang.org/grpc v1.47.0 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
@@ -139,4 +141,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.0 // indirect
+	rsc.io/binaryregexp v0.2.0 // indirect
 )

@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/corazawaf/coraza/v3"
-	"go.uber.org/zap"
 )
 
 func TestHTTP(t *testing.T) {
@@ -22,7 +21,6 @@ SecRule ARGS "456" "id:1,phase:2,deny,status:403"
 	if err != nil {
 		t.Error(err)
 	}
-	logger, _ := zap.NewDevelopment()
 	tx := waf.NewTransaction()
 	// we build a sample POST request
 	r, err := http.NewRequest("POST", "/sample.php", strings.NewReader("test=456"))
@@ -30,7 +28,7 @@ SecRule ARGS "456" "id:1,phase:2,deny,status:403"
 		t.Error(err)
 	}
 	r.Header.Add("Content-Type", "x-www-form-urlencoded")
-	it, err := processRequest(tx, r, logger)
+	it, err := processRequest(tx, r)
 	if err != nil {
 		t.Error(err)
 	}
