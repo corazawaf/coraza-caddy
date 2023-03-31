@@ -47,7 +47,8 @@ func (m *corazaModule) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger(m)
 
 	config := coraza.NewWAFConfig().
-		WithErrorCallback(logger(m.logger)).
+		WithErrorCallback(newErrorCb(m.logger)).
+		WithDebugLogger(newLogger(m.logger)).
 		WithRootFS(merged_fs.NewMergedFS(coreruleset.FS, io.OSFS))
 
 	if m.Directives != "" {
@@ -172,17 +173,14 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	return m, err
 }
 
-func logger(logger *zap.Logger) func(types.MatchedRule) {
+func newErrorCb(logger *zap.Logger) func(types.MatchedRule) {
 	return func(mr types.MatchedRule) {
 		data := mr.ErrorLog(403)
 		switch mr.Rule().Severity() {
-		case types.RuleSeverityEmergency:
-			logger.Error(data)
-		case types.RuleSeverityAlert:
-			logger.Error(data)
-		case types.RuleSeverityCritical:
-			logger.Error(data)
-		case types.RuleSeverityError:
+		case types.RuleSeverityEmergency,
+			types.RuleSeverityAlert,
+			types.RuleSeverityCritical,
+			types.RuleSeverityError:
 			logger.Error(data)
 		case types.RuleSeverityWarning:
 			logger.Warn(data)
