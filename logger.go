@@ -6,7 +6,6 @@ import (
 
 	"github.com/corazawaf/coraza/v3/debuglog"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 type logger struct {
@@ -24,18 +23,9 @@ func newLogger(l *zap.Logger) debuglog.Logger {
 }
 
 func (l *logger) WithOutput(w io.Writer) debuglog.Logger {
-	return &logger{
-		Logger: l.Logger.WithOptions(
-			zap.WrapCore(func(c zapcore.Core) zapcore.Core {
-				return zapcore.NewCore(
-					zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-					zapcore.AddSync(w),
-					l.Logger.Level(),
-				)
-			}),
-		),
-		level: l.level,
-	}
+	// TODO: check if we can change the output for the logger.
+	// Does it make sense to use zap if we are changing the output?
+	return l
 }
 
 func (l *logger) WithLevel(level debuglog.Level) debuglog.Logger {
