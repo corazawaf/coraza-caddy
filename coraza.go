@@ -27,6 +27,7 @@ func init() {
 
 // corazaModule is a Web Application Firewall implementation for Caddy.
 type corazaModule struct {
+	// deprecated
 	Include    []string `json:"include"`
 	Directives string   `json:"directives"`
 
@@ -54,8 +55,8 @@ func (m *corazaModule) Provision(ctx caddy.Context) error {
 		config = config.WithDirectives(m.Directives)
 	}
 
-	m.logger.Debug("Preparing to include files", zap.Int("count", len(m.Include)), zap.Strings("files", m.Include))
 	if len(m.Include) > 0 {
+		m.logger.Warn("Include field is deprected, do the include in directives instead")
 		for _, file := range m.Include {
 			if strings.Contains(file, "*") {
 				m.logger.Debug("Preparing to expand glob", zap.String("pattern", file))

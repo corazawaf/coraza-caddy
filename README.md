@@ -13,14 +13,15 @@ OWASP Coraza WAF is 100% compatible with OWASP Coreruleset and Modsecurity synta
 ```caddy
 coraza_waf {
  directives `
+  Include /path/to/config.conf
   SecAction "id:1,pass,log"
  `
- include /path/to/config.conf
 }
 ```
 
 Sample usage:  
-Important: `order coraza_waf first` must be always included in your Caddyfile for Coraza module to work
+
+**Important:** `order coraza_waf first` must be always included in your Caddyfile for Coraza module to work
 
 ```caddy
 {
@@ -33,10 +34,10 @@ http://127.0.0.1:8080 {
    SecAction "id:1,pass,log"
    SecRule REQUEST_URI "/test5" "id:2, deny, log, phase:1"
    SecRule REQUEST_URI "/test6" "id:4, deny, log, phase:3"
+   Include file1.conf 
+   Include file2.conf
+   Include /some/path/*.conf
   `
-  include file1.conf 
-  include file2.conf
-  include /some/path/*.conf
  }
  reverse_proxy http://192.168.1.15:8080
 }
@@ -55,16 +56,14 @@ xcaddy build --with github.com/corazawaf/coraza-caddy
 You may run the test suite by executing:
 
 ```shell
-git clone https://github.com/corazawaf/coraza-caddy
-cd coraza-caddy
-go test ./...`
+go run mage.go test
 ```
 
 ## Using OWASP Core Ruleset
 
 Clone the [coreruleset repository](https://github.com/coreruleset/coreruleset) and download the default coraza configurations from [Coraza repository](https://raw.githubusercontent.com/corazawaf/coraza/v2/master/coraza.conf-recommended), then add the following to you coraza_waf directive:
 
-```
+```seclang
 include caddypath/coraza.conf-recommended
 include caddypath/coreruleset/crs-setup.conf.example
 include caddypath/coreruleset/rules/*.conf
