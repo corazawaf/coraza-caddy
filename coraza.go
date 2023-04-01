@@ -146,14 +146,21 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	if !d.Next() {
 		return d.Err("expected token following filter")
 	}
+
 	m.Include = []string{}
 	for d.NextBlock(0) {
 		key := d.Val()
 		var value string
-		d.Args(&value)
-		if d.NextArg() {
+		if !d.Args(&value) {
+			// not enough args
 			return d.ArgErr()
 		}
+
+		if d.NextArg() {
+			// too many args
+			return d.ArgErr()
+		}
+
 		switch key {
 		case "include":
 			m.Include = append(m.Include, value)
@@ -163,6 +170,7 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			return d.Errf("invalid key for filter directive: %s", key)
 		}
 	}
+
 	return nil
 }
 
