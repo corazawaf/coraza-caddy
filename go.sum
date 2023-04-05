@@ -123,8 +123,6 @@ github.com/cockroachdb/apd v1.1.0 h1:3LFP3629v+1aKXU5Q37mxmRxX/pIu1nijXydLShEq5I
 github.com/cockroachdb/apd v1.1.0/go.mod h1:8Sl8LxpKi29FqWXR16WEFZRNSz3SoPzUzeMeY4+DwBQ=
 github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:zn76sxSg3SzpJ0PPJaLDCu+Bu0Lg3sKTORVIj19EIF8=
 github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
-github.com/corazawaf/coraza-coreruleset v0.0.0-20230313182618-4e081de217cb h1:oTPsaA/dCsrRHm8p6zhHH6ixEPJC3WDmpitNpPMb/KY=
-github.com/corazawaf/coraza-coreruleset v0.0.0-20230313182618-4e081de217cb/go.mod h1:h7fBXlh00atH/uVC9Lpjawg/RlJCsHjvyVk+bP3ylq8=
 github.com/corazawaf/coraza-coreruleset v0.0.0-20230405190458-b4d2a6f6bdfc h1:EU5PEFuQ4PTzkz2YFoCQwI73gu8GW95txz3dMNGsseA=
 github.com/corazawaf/coraza-coreruleset v0.0.0-20230405190458-b4d2a6f6bdfc/go.mod h1:7rsocqNDkTCira5T0M7buoKR2ehh7YZiPkzxRuAgvVU=
 github.com/corazawaf/coraza/v3 v3.0.0-rc.1.0.20230329004849-daf3747c8c45 h1:ROPaiSu+KA0Z4/dgUbvLVi6VCSKa/98PB78fh5WZpxI=
