@@ -56,7 +56,7 @@ func (m *corazaModule) Provision(ctx caddy.Context) error {
 	}
 
 	if len(m.Include) > 0 {
-		m.logger.Warn("include field is deprecated, please use the Include directive instead")
+		m.logger.Warn("include field is deprecated, please use the Include directive inside 'directives' field instead")
 		for _, file := range m.Include {
 			if strings.Contains(file, "*") {
 				m.logger.Debug("Preparing to expand glob", zap.String("pattern", file))
