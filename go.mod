@@ -6,8 +6,8 @@ require (
 	github.com/caddyserver/caddy/v2 v2.6.2
 	github.com/corazawaf/coraza-coreruleset v0.0.0-20230313182618-4e081de217cb
 	github.com/corazawaf/coraza/v3 v3.0.0-rc.1.0.20230329004849-daf3747c8c45
+	github.com/jcchavezs/mergefs v0.0.0-20230405082700-7419041088d5
 	github.com/magefile/mage v1.14.0
-	github.com/yalue/merged_fs v1.2.3
 	go.uber.org/zap v1.24.0
 )
 

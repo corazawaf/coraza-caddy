@@ -61,14 +61,20 @@ go run mage.go test
 
 ## Using OWASP Core Ruleset
 
-Clone the [coreruleset repository](https://github.com/coreruleset/coreruleset) and download the default coraza configurations from [Coraza repository](https://raw.githubusercontent.com/corazawaf/coraza/v2/master/coraza.conf-recommended), then add the following to you coraza_waf directive:
+You can load OWASP CRS by passing the field `load_owasp_crs` and then load the CRS files in the directives as described in the [coraza-coreruleset](https://github.com/corazawaf/coraza-coreruleset) documentation.
 
-```seclang
-include caddypath/coraza.conf-recommended
-include caddypath/coreruleset/crs-setup.conf.example
-include caddypath/coreruleset/rules/*.conf
+```caddy
+:8080 {
+ coraza_waf {
+  load_owasp_crs
+  directives `
+   Include @coraza.conf-recommended
+   Include @crs-setup.conf.example
+   Include @owasp_crs/*.conf
+   SecRuleEngine On
+  `
+ }
+
+ reverse_proxy httpbin:8081
+}
 ```
-
-## Known Issues
-
-## FAQ

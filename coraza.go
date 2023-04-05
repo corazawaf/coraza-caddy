@@ -13,10 +13,10 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	coreruleset "github.com/corazawaf/coraza-coreruleset"
-	"github.com/corazawaf/coraza-coreruleset/io"
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
-	"github.com/yalue/merged_fs"
+	"github.com/jcchavezs/mergefs"
+	"github.com/jcchavezs/mergefs/io"
 	"go.uber.org/zap"
 )
 
@@ -28,8 +28,9 @@ func init() {
 // corazaModule is a Web Application Firewall implementation for Caddy.
 type corazaModule struct {
 	// deprecated
-	Include    []string `json:"include"`
-	Directives string   `json:"directives"`
+	Include      []string `json:"include"`
+	Directives   string   `json:"directives"`
+	LoadOWASPCRS bool     `json:"load_owasp_crs"`
 
 	logger *zap.Logger
 	waf    coraza.WAF
@@ -49,15 +50,18 @@ func (m *corazaModule) Provision(ctx caddy.Context) error {
 
 	config := coraza.NewWAFConfig().
 		WithErrorCallback(newErrorCb(m.logger)).
-		WithDebugLogger(newLogger(m.logger)).
-		WithRootFS(merged_fs.NewMergedFS(coreruleset.FS, io.OSFS))
+		WithDebugLogger(newLogger(m.logger))
+
+	if m.LoadOWASPCRS {
+		config = config.WithRootFS(mergefs.Merge(coreruleset.FS, io.OSFS))
+	}
 
 	if m.Directives != "" {
 		config = config.WithDirectives(m.Directives)
 	}
 
 	if len(m.Include) > 0 {
-		m.logger.Warn("include field is deprecated, please use the Include directive inside 'directives' field instead")
+		m.logger.Warn("'include' field is deprecated, please use the Include directive inside 'directives' field instead")
 		for _, file := range m.Include {
 			if strings.Contains(file, "*") {
 				m.logger.Debug("Preparing to expand glob", zap.String("pattern", file))
@@ -162,6 +166,8 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		}
 
 		switch key {
+		case "load_owasp_crs":
+			m.LoadOWASPCRS = true
 		case "include":
 			m.Include = append(m.Include, value)
 		case "directives":
