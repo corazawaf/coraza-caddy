@@ -50,6 +50,12 @@ func processRequest(tx types.Transaction, req *http.Request) (*types.Interruptio
 		tx.SetServerName(serverName)
 	}
 
+	// Transfer-Encoding header is removed by go/http
+	// We manually add it to make rules relying on it work (E.g. CRS rule 920171)
+	if req.TransferEncoding != nil {
+		tx.AddRequestHeader("Transfer-Encoding", req.TransferEncoding[0])
+	}
+
 	in = tx.ProcessRequestHeaders()
 	if in != nil {
 		return in, nil
