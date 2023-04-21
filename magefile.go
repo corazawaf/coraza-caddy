@@ -80,6 +80,23 @@ func E2e() error {
 	return err
 }
 
+// Ftw runs CRS regressions tests. Requires docker-compose.
+func Ftw() error {
+	if err := sh.RunV("docker-compose", "--file", "ftw/docker-compose.yml", "build", "--pull"); err != nil {
+		return err
+	}
+	defer func() {
+		_ = sh.RunV("docker-compose", "--file", "ftw/docker-compose.yml", "down", "-v")
+	}()
+	env := map[string]string{
+		"FTW_CLOUDMODE": os.Getenv("FTW_CLOUDMODE"),
+		"FTW_INCLUDE":   os.Getenv("FTW_INCLUDE"),
+	}
+	task := "ftw"
+	return sh.RunWithV(env, "docker-compose", "--file", "ftw/docker-compose.yml", "run", "--rm", task)
+}
+
+// Coverage runs tests with coverage and race detector enabled.
 func Coverage() error {
 	if err := os.MkdirAll("build", 0755); err != nil {
 		return err
@@ -115,10 +132,12 @@ func Check() {
 	mg.SerialDeps(Lint, Test)
 }
 
+// Build builds the plugin.
 func Build() error {
 	return build("")
 }
 
+// BuildLinux builds the plugin with GOOS=linux.
 func BuildLinux() error {
 	return build("linux")
 }
@@ -133,4 +152,19 @@ func build(goos string) error {
 	return sh.RunWithV(env, "xcaddy", "build",
 		"--with", "github.com/corazawaf/coraza-caddy=.",
 		"--output", buildDir)
+}
+
+// RunExample spins up the test environment, access at http://localhost:8080. Requires docker-compose.
+func RunExample() error {
+	return sh.RunV("docker-compose", "--file", "example/docker-compose.yml", "up", "-d", "caddy-logs")
+}
+
+// TeardownExample tears down the test environment. Requires docker-compose.
+func TeardownExample() error {
+	return sh.RunV("docker-compose", "--file", "example/docker-compose.yml", "down")
+}
+
+// ReloadExample reload the test environment. Requires docker-compose.
+func ReloadExample() error {
+	return sh.RunV("docker-compose", "--file", "example/docker-compose.yml", "restart")
 }
