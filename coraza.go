@@ -4,6 +4,7 @@
 package coraza
 
 import (
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -30,9 +31,9 @@ type corazaModule struct {
 	// deprecated
 	Include    []string `json:"include"`
 	Directives string   `json:"directives"`
-
-	logger *zap.Logger
-	waf    coraza.WAF
+	Tag        string   `json:"tag"`
+	logger     *zap.Logger
+	waf        coraza.WAF
 }
 
 // CaddyModule returns the Caddy module information.
@@ -48,7 +49,7 @@ func (m *corazaModule) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger(m)
 
 	config := coraza.NewWAFConfig().
-		WithErrorCallback(newErrorCb(m.logger)).
+		WithErrorCallback(newErrorCb(m.logger, m.Tag)).
 		WithDebugLogger(newLogger(m.logger)).
 		WithRootFS(merged_fs.NewMergedFS(coreruleset.FS, io.OSFS))
 
@@ -149,6 +150,7 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	}
 
 	m.Include = []string{}
+	m.Tag = ""
 	for d.NextBlock(0) {
 		key := d.Val()
 		var value string
@@ -167,6 +169,8 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			m.Include = append(m.Include, value)
 		case "directives":
 			m.Directives = value
+		case "tag":
+			m.Tag = value
 		default:
 			return d.Errf("invalid key for filter directive: %s", key)
 		}
@@ -182,23 +186,29 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	return m, err
 }
 
-func newErrorCb(logger *zap.Logger) func(types.MatchedRule) {
+func newErrorCb(logger *zap.Logger, tag string) func(types.MatchedRule) {
 	return func(mr types.MatchedRule) {
 		data := mr.ErrorLog(403)
+		var msg string
+		if tag == "" {
+			msg = data
+		} else {
+			msg = fmt.Sprintf("[tag %s] %s", tag, data)
+		}
 		switch mr.Rule().Severity() {
 		case types.RuleSeverityEmergency,
 			types.RuleSeverityAlert,
 			types.RuleSeverityCritical,
 			types.RuleSeverityError:
-			logger.Error(data)
+			logger.Error(msg)
 		case types.RuleSeverityWarning:
-			logger.Warn(data)
+			logger.Warn(msg)
 		case types.RuleSeverityNotice:
-			logger.Info(data)
+			logger.Info(msg)
 		case types.RuleSeverityInfo:
-			logger.Info(data)
+			logger.Info(msg)
 		case types.RuleSeverityDebug:
-			logger.Debug(data)
+			logger.Debug(msg)
 		}
 	}
 }
