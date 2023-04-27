@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddytest"
 )
 
@@ -142,9 +143,57 @@ func newTester(caddyfile string, t *testing.T) (*caddytest.Tester, error) {
 	tester := caddytest.NewTester(t)
 	configContent, err := os.ReadFile(caddyfile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load configuration file %s: %s", caddyfile, err)
+		return nil, fmt.Errorf("failed to load configuration file %q: %s", caddyfile, err)
 	}
-	rawConfig := string(configContent)
-	tester.InitServer(rawConfig, "caddyfile")
+	tester.InitServer(string(configContent), "caddyfile")
 	return tester, nil
+}
+
+func TestUnmarshalCaddyfile(t *testing.T) {
+	tests := map[string]struct {
+		config    string
+		shouldErr bool
+	}{
+		"empty config": {
+			shouldErr: true,
+		},
+		"invalid config for directives without value": {
+			config: `coraza_waf {
+				directives
+			}`,
+			shouldErr: true,
+		},
+		"invalid config for directives with more than one value": {
+			config: `coraza_waf {
+				directives first_arg second_arg
+			}`,
+			shouldErr: true,
+		},
+		"invalid config for unexpected key": {
+			config: `coraza_waf {
+				unknown_key first_arg
+			}`,
+			shouldErr: true,
+		},
+		"valid config": {
+			config: `coraza_waf {
+				directives ` + "``" + `
+			}`,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			dispenser := caddyfile.NewTestDispenser(test.config)
+			m := &corazaModule{}
+			err := m.UnmarshalCaddyfile(dispenser)
+			if test.shouldErr && err == nil {
+				t.Fatal("Expected error but got nil")
+			}
+
+			if !test.shouldErr && err != nil {
+				t.Fatalf("Expected no error but got: %v", err)
+			}
+		})
+	}
 }
