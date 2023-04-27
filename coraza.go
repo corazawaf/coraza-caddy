@@ -147,7 +147,6 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	if !d.Next() {
 		return d.Err("expected token following filter")
 	}
-
 	m.Include = []string{}
 	for d.NextBlock(0) {
 		key := d.Val()
