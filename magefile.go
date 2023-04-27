@@ -72,7 +72,12 @@ func Test() error {
 
 // E2e runs e2e tests with a built plugin against the example deployment. Requires docker-compose.
 func E2e() error {
-	return sh.RunV("docker-compose", "-f", "e2e/docker-compose.yml", "up", "--abort-on-container-exit", "tests")
+	var err error
+	if err = sh.RunV("docker-compose", "-f", "e2e/docker-compose.yml", "up", "--abort-on-container-exit", "tests"); err != nil {
+		sh.RunV("docker-compose", "-f", "e2e/docker-compose.yml", "logs", "caddy")
+	}
+
+	return err
 }
 
 func Coverage() error {
