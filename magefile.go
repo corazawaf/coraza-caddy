@@ -133,25 +133,31 @@ func Check() {
 }
 
 // Build builds the plugin.
-func Build() error {
-	return build("")
+func BuildCaddy() error {
+	return buildCaddy("")
 }
 
 // BuildLinux builds the plugin with GOOS=linux.
-func BuildLinux() error {
-	return build("linux")
+func BuildCaddyLinux() error {
+	return buildCaddy("linux")
 }
 
-func build(goos string) error {
+func buildCaddy(goos string) error {
 	env := map[string]string{}
 	buildDir := "build/caddy"
 	if goos != "" {
 		env["GOOS"] = goos
 		buildDir = fmt.Sprintf("%s-%s", buildDir, goos)
 	}
-	return sh.RunWithV(env, "xcaddy", "build",
-		"--with", "github.com/corazawaf/coraza-caddy=.",
+
+	buildArgs := []string{"build"}
+	if os.Getenv("CADDY_VERSION") != "" {
+		buildArgs = append(buildArgs, os.Getenv("CADDY_VERSION"))
+	}
+	buildArgs = append(buildArgs, "--with", "github.com/corazawaf/coraza-caddy=.",
 		"--output", buildDir)
+
+	return sh.RunWithV(env, "xcaddy", buildArgs...)
 }
 
 // RunExample spins up the test environment, access at http://localhost:8080. Requires docker-compose.
