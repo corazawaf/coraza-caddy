@@ -169,15 +169,23 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 			}`,
 			shouldErr: true,
 		},
+
 		"invalid config for unexpected key": {
 			config: `coraza_waf {
 				unknown_key first_arg
 			}`,
 			shouldErr: true,
 		},
+		"invalid config for load_owasp_crs with value": {
+			config: `coraza_waf {
+				load_owasp_crs next_arg
+			}`,
+			shouldErr: true,
+		},
 		"valid config": {
 			config: `coraza_waf {
-				directives ` + "``" + `
+				load_owasp_crs
+				directives ` + "`Include my-rules.conf`" + `
 			}`,
 		},
 	}
