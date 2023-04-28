@@ -1,0 +1,51 @@
+{
+    debug
+    auto_https off
+    order coraza_waf first
+}
+
+:8080 {
+	coraza_waf {
+		directives `
+			Include @coraza.conf-recommended
+			# FTW config
+			SecDefaultAction "phase:3,log,auditlog,pass"
+			SecDefaultAction "phase:4,log,auditlog,pass"
+			SecDefaultAction "phase:5,log,auditlog,pass"
+			SecDebugLogLevel 3
+
+			SecAction "id:900005,\
+			phase:1,\
+			nolog,\
+			pass,\
+			ctl:ruleEngine=DetectionOnly,\
+			ctl:ruleRemoveById=910000,\
+			setvar:tx.blocking_paranoia_level=4,\
+			setvar:tx.crs_validate_utf8_encoding=1,\
+			setvar:tx.arg_name_length=100,\
+			setvar:tx.arg_length=400,\
+			setvar:tx.total_arg_length=64000,\
+			setvar:tx.max_num_args=255,\
+			setvar:tx.max_file_size=64100,\
+			setvar:tx.combined_file_sizes=65535"
+
+			SecRule REQUEST_HEADERS:X-CRS-Test "@rx ^.*$" \
+			"id:999999,\
+			phase:1,\
+			pass,\
+			t:none,\
+			log,\
+			msg:'X-CRS-Test %{MATCHED_VAR}',\
+			ctl:ruleRemoveById=1-999999"
+
+			Include @crs-setup.conf.example
+			Include @owasp_crs/*.conf
+		`
+	}
+	# Only access logs are logged via log directive, ftw is looking for error logs
+	# log {
+	# 	output file /home/caddy/logs/caddy.log
+	# 	level error
+	# }
+	reverse_proxy httpbin:8081
+}

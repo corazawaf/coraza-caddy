@@ -8,6 +8,29 @@
 
 OWASP Coraza WAF is 100% compatible with OWASP Coreruleset and Modsecurity syntax.
 
+## Getting started
+
+`go run mage.go -l` lists all the available commands:
+
+```bash
+▶ go run mage.go -l
+Targets:
+  build              builds the plugin.
+  buildLinux         builds the plugin with GOOS=linux.
+  check              runs lint and tests.
+  coverage           runs tests with coverage and race detector enabled.
+  doc                runs godoc, access at http://localhost:6060
+  e2e                runs e2e tests with a built plugin against the example deployment.
+  format             formats code in this repository.
+  ftw                runs CRS regressions tests.
+  lint               verifies code quality.
+  precommit          installs a git hook to run check when committing
+  reloadExample      reload the test environment.
+  runExample         spins up the test environment, access at http://localhost:8080.
+  teardownExample    tears down the test environment.
+  test               runs all tests.
+```
+
 ## Plugin syntax
 
 ```caddy

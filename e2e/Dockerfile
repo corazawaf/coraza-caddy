@@ -1,6 +1,6 @@
 FROM debian
 
-COPY e2e/Caddyfile /etc/caddy/Caddyfile
+COPY example/Caddyfile /etc/caddy/Caddyfile
 
 COPY build/caddy-linux /usr/bin/caddy
 
