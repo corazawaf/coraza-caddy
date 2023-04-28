@@ -154,26 +154,32 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 	m.Include = []string{}
 	for d.NextBlock(0) {
 		key := d.Val()
-		var value string
-		if !d.Args(&value) {
-			// not enough args
-			return d.ArgErr()
-		}
-
-		if d.NextArg() {
-			// too many args
-			return d.ArgErr()
-		}
-
 		switch key {
 		case "load_owasp_crs":
+			if d.NextArg() {
+				return d.ArgErr()
+			}
 			m.LoadOWASPCRS = true
-		case "include":
-			m.Include = append(m.Include, value)
-		case "directives":
-			m.Directives = value
+		case "directives", "include":
+			var value string
+			if !d.Args(&value) {
+				// not enough args
+				return d.ArgErr()
+			}
+
+			if d.NextArg() {
+				// too many args
+				return d.ArgErr()
+			}
+
+			switch key {
+			case "include":
+				m.Include = append(m.Include, value)
+			case "directives":
+				m.Directives = value
+			}
 		default:
-			return d.Errf("invalid key for filter directive: %s", key)
+			return d.Errf("invalid key %q", key)
 		}
 	}
 
