@@ -7,7 +7,7 @@ on:
     - cron: "0 4 * * *"
 
 jobs:
-  test:
+  nightly:
     strategy:
       matrix:
         go-version: [1.18.x]
