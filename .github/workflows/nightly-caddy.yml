@@ -1,19 +1,13 @@
-name: Tests
-
+name: Nightly Caddy
 on:
-  push:
-    branches:
-      - "master"
-    paths-ignore:
-      - "**/*.md"
-      - "LICENSE"
   pull_request:
-    paths-ignore:
-      - "**/*.md"
-      - "LICENSE"
+    paths:
+      - ".github/workflows/nightly-caddy.yml"
+  schedule:
+    - cron: "0 4 * * *"
 
 jobs:
-  test:
+  nightly-caddy:
     strategy:
       matrix:
         go-version: [1.19.x]
@@ -32,14 +26,11 @@ jobs:
           lfs: true
           fetch-depth: 0 #for better blame info
 
-      - name: Tests and coverage
-        run: go run mage.go coverage
-
       - name: Install xcaddy
         run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@${{ matrix.xcaddy-version }}
 
       - name: Build caddy
-        run: go run mage.go buildCaddyLinux
+        run: CADDY_VERSION=master go run mage.go buildCaddyLinux
 
       - name: Run e2e tests
         run: go run mage.go e2e
