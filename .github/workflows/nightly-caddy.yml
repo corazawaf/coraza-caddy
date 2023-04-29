@@ -2,7 +2,7 @@ name: Nightly Caddy
 on:
   pull_request:
     paths:
-      - ".github/workflows/nightly-caddy.yaml"
+      - ".github/workflows/nightly-caddy.yml"
   schedule:
     - cron: "0 4 * * *"
 
