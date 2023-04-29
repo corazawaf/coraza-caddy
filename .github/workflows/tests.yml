@@ -19,7 +19,6 @@ jobs:
         go-version: [1.18.x]
         os: [ubuntu-latest]
         xcaddy-version: [v0.3.2]
-        caddy-version: [v2.6.4]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install Go
@@ -36,6 +35,6 @@ jobs:
       - name: Install xcaddy
         run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@${{ matrix.xcaddy-version }}
       - name: Build caddy
-        run: CADDY_VERSION=${{ matrix.caddy-version }} go run mage.go buildCaddyLinux
+        run: go run mage.go buildCaddyLinux
       - name: Run e2e tests
         run: go run mage.go e2e
