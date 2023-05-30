@@ -195,21 +195,21 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 
 func newErrorCb(logger *zap.Logger) func(types.MatchedRule) {
 	return func(mr types.MatchedRule) {
-		data := mr.ErrorLog(403)
+		logMsg := mr.ErrorLog()
 		switch mr.Rule().Severity() {
 		case types.RuleSeverityEmergency,
 			types.RuleSeverityAlert,
 			types.RuleSeverityCritical,
 			types.RuleSeverityError:
-			logger.Error(data)
+			logger.Error(logMsg)
 		case types.RuleSeverityWarning:
-			logger.Warn(data)
+			logger.Warn(logMsg)
 		case types.RuleSeverityNotice:
-			logger.Info(data)
+			logger.Info(logMsg)
 		case types.RuleSeverityInfo:
-			logger.Info(data)
+			logger.Info(logMsg)
 		case types.RuleSeverityDebug:
-			logger.Debug(data)
+			logger.Debug(logMsg)
 		}
 	}
 }
