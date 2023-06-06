@@ -34,7 +34,7 @@ jobs:
 
       - name: Get last commit of coraza
         id: coraza-latest-commit
-        run: echo "value=$(gh api repos/corazawaf/coraza/commits/v3/dev -q .sha)" >> $GITHUB_OUTPUT
+        run: echo "value=$(gh api repos/corazawaf/coraza/commits/main -q .sha)" >> $GITHUB_OUTPUT
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

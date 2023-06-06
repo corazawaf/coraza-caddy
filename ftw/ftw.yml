@@ -5,7 +5,7 @@ testoverride:
     dest_addr: caddy
     port: 8080
   ignore:
-    # Imported from https://github.com/corazawaf/coraza/blob/v3/dev/testing/coreruleset/.ftw.yml
+    # Imported from https://github.com/corazawaf/coraza/blob/main/testing/coreruleset/.ftw.yml
     920100-4: 'Invalid uri, Coraza not reached - 404 page not found'
     920100-5: 'Invalid uri, Coraza not reached - 404 page not found'
     920100-8: 'Go/http allows a colon in the path. Test expects status 400 or 403 (Apache behaviour)'
