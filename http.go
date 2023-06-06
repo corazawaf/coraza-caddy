@@ -14,7 +14,7 @@ import (
 	"github.com/corazawaf/coraza/v3/types"
 )
 
-// Copied from https://github.com/corazawaf/coraza/blob/v3/dev/http/middleware.go
+// Copied from https://github.com/corazawaf/coraza/blob/main/http/middleware.go
 
 func processRequest(tx types.Transaction, req *http.Request) (*types.Interruption, error) {
 	var (

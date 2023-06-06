@@ -12,7 +12,7 @@ import (
 	"github.com/corazawaf/coraza/v3/types"
 )
 
-// Copied from https://github.com/corazawaf/coraza/blob/v3/dev/http/interceptor.go
+// Copied from https://github.com/corazawaf/coraza/blob/main/http/interceptor.go
 // rwInterceptor intercepts the ResponseWriter, so it can track response size
 // and returned status code.
 type rwInterceptor struct {
