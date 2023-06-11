@@ -8,6 +8,7 @@ require (
 	github.com/corazawaf/coraza/v3 v3.0.0-rc.3
 	github.com/jcchavezs/mergefs v0.0.0-20230405222254-20429875efdd
 	github.com/magefile/mage v1.15.0
+	github.com/stretchr/testify v1.8.2
 	go.uber.org/zap v1.24.0
 )
 
@@ -29,6 +30,7 @@ require (
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/corazawaf/libinjection-go v0.1.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
 	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
 	github.com/dgraph-io/ristretto v0.0.4-0.20200906165740-41ebdbffecfd // indirect
@@ -83,6 +85,7 @@ require (
 	github.com/onsi/ginkgo v1.16.4 // indirect
 	github.com/petar-dambovaliev/aho-corasick v0.0.0-20211021192214-5ab2d9280aa9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.12.2 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
