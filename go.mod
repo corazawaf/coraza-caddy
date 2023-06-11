@@ -1,4 +1,4 @@
-module github.com/corazawaf/coraza-caddy
+module github.com/corazawaf/coraza-caddy/v2
 
 go 1.18
 
@@ -145,9 +145,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.0 // indirect
 	rsc.io/binaryregexp v0.2.0 // indirect
-)
-
-retract (
-	[v1.0.0, v1.2.2]
-	v1.0.0-beta.1
 )

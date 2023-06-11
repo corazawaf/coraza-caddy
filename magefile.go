@@ -41,7 +41,7 @@ func Format() error {
 	return sh.RunV("go", "run", fmt.Sprintf("github.com/rinchsan/gosimports/cmd/gosimports@%s", gosImportsVer),
 		"-w",
 		"-local",
-		"github.com/corazawaf/coraza-caddy",
+		"github.com/corazawaf/coraza-caddy/v2",
 		".")
 }
 
@@ -154,7 +154,7 @@ func buildCaddy(goos string) error {
 	if os.Getenv("CADDY_VERSION") != "" {
 		buildArgs = append(buildArgs, os.Getenv("CADDY_VERSION"))
 	}
-	buildArgs = append(buildArgs, "--with", "github.com/corazawaf/coraza-caddy=.",
+	buildArgs = append(buildArgs, "--with", "github.com/corazawaf/coraza-caddy/v2=.",
 		"--output", buildDir)
 
 	return sh.RunWithV(env, "xcaddy", buildArgs...)
