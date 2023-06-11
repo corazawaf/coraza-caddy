@@ -43,11 +43,7 @@ func processRequest(tx types.Transaction, req *http.Request) (*types.Interruptio
 	if req.Host != "" {
 		tx.AddRequestHeader("Host", req.Host)
 		// This connector relies on the host header (now host field) to populate ServerName
-		serverName, err := parseServerName(req.Host)
-		if err != nil {
-			tx.DebugLogger().Warn().Err(err).Msg("failed to parse server name")
-		}
-		tx.SetServerName(serverName)
+		tx.SetServerName(parseServerName(req.Host))
 	}
 
 	// Transfer-Encoding header is removed by go/http
@@ -111,13 +107,11 @@ func processRequest(tx types.Transaction, req *http.Request) (*types.Interruptio
 }
 
 // parseServerName parses r.Host in order to retrieve the virtual host.
-func parseServerName(host string) (string, error) {
+func parseServerName(host string) string {
 	serverName, _, err := net.SplitHostPort(host)
 	if err != nil {
-		// missing port or bad format
-		err = fmt.Errorf("failed to parse server name from authority %q, %v", host, err)
-		serverName = host
+		return host
 	}
 	// anyways serverName is returned
-	return serverName, err
+	return serverName
 }
