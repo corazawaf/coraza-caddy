@@ -160,6 +160,12 @@ func buildCaddy(goos string) error {
 	return sh.RunWithV(env, "xcaddy", buildArgs...)
 }
 
+// BuildExample builds the example deployment. Requires docker-compose.
+func BuildExample() error {
+	mg.SerialDeps(BuildCaddyLinux)
+	return sh.RunV("docker-compose", "--file", "example/docker-compose.yml", "build", "--no-cache", "caddy")
+}
+
 // RunExample spins up the test environment, access at http://localhost:8080. Requires docker-compose.
 func RunExample() error {
 	return sh.RunV("docker-compose", "--file", "example/docker-compose.yml", "up", "-d", "caddy-logs")
