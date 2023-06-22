@@ -115,9 +115,12 @@ curl -i localhost:8080/
 
 ```bash
 # in terminal 1
-go run mage.go buildExample
-./build/caddy run --config example/Caddyfile --adapter caddyfile
+go run github.com/mccutchen/go-httpbin/v2/cmd/go-httpbin@v2.9.0 -port 8081
 
 # in terminal 2
+go run mage.go buildCaddy
+./build/caddy run --config example/Caddyfile --adapter caddyfile
+
+# in terminal 3
 curl -i localhost:8080/
 ```
