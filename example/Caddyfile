@@ -22,5 +22,5 @@
 			SecRule RESPONSE_BODY "@contains responsebodycode" "id:104,phase:4,t:lowercase,deny,status:403"
 		`
 	}
-	reverse_proxy httpbin:8081
+	reverse_proxy {$HTTPBIN_HOST:localhost}:8081
 }

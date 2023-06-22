@@ -101,3 +101,26 @@ You can load OWASP CRS by passing the field `load_owasp_crs` and then load the C
  reverse_proxy httpbin:8081
 }
 ```
+
+## Running Example
+
+### Docker
+
+```bash
+go run mage.go buildExample runExample
+curl -i localhost:8080/
+```
+
+### Local
+
+```bash
+# in terminal 1
+go run github.com/mccutchen/go-httpbin/v2/cmd/go-httpbin@v2.9.0 -port 8081
+
+# in terminal 2
+go run mage.go buildCaddy
+./build/caddy run --config example/Caddyfile --adapter caddyfile
+
+# in terminal 3
+curl -i localhost:8080/
+```

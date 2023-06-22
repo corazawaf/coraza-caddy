@@ -1,6 +1,6 @@
 services:
   httpbin:
-    image: mccutchen/go-httpbin:v2.5.0
+    image: mccutchen/go-httpbin:v2.9.0
     command: [ "/bin/go-httpbin", "-port", "8081" ]
     ports:
       - 8081:8081
@@ -11,6 +11,9 @@ services:
     build:
       context: ..
       dockerfile: ./e2e/Dockerfile
+    environment:
+      - HTTPBIN_HOST=httpbin
+
   tests:
     depends_on:
       - caddy
