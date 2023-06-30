@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    allow:
+      - dependency-name: "github.com/corazawaf/coraza/v3"
+        dependency-type: "direct"
+    target-branch: "main"
