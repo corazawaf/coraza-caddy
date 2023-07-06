@@ -125,8 +125,8 @@ github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa/go.mod h1:z
 github.com/codahale/hdrhistogram v0.0.0-20161010025455-3a0bb77429bd/go.mod h1:sE/e/2PUdi/liOCUjSTXgM1o87ZssimdTWN964YiIeI=
 github.com/corazawaf/coraza-coreruleset v0.0.0-20230405190458-b4d2a6f6bdfc h1:EU5PEFuQ4PTzkz2YFoCQwI73gu8GW95txz3dMNGsseA=
 github.com/corazawaf/coraza-coreruleset v0.0.0-20230405190458-b4d2a6f6bdfc/go.mod h1:7rsocqNDkTCira5T0M7buoKR2ehh7YZiPkzxRuAgvVU=
-github.com/corazawaf/coraza/v3 v3.0.3-0.20230705202759-23382ac1a0ad h1:r12Rz80w26vJVLerUzyKRhHvpHrwNt+OQM9RLDk5YpA=
-github.com/corazawaf/coraza/v3 v3.0.3-0.20230705202759-23382ac1a0ad/go.mod h1:qAwJTn9FEtbUYLf8p8gILsaASIwHy1v74jjcYG4h+zM=
+github.com/corazawaf/coraza/v3 v3.0.3-0.20230706080549-b8df0c2b2163 h1:tilhg5zk/NunATBgdNJ31XQJSAlVKTyrRP6vvTvFqhk=
+github.com/corazawaf/coraza/v3 v3.0.3-0.20230706080549-b8df0c2b2163/go.mod h1:qAwJTn9FEtbUYLf8p8gILsaASIwHy1v74jjcYG4h+zM=
 github.com/corazawaf/libinjection-go v0.1.2 h1:oeiV9pc5rvJ+2oqOqXEAMJousPpGiup6f7Y3nZj5GoM=
 github.com/corazawaf/libinjection-go v0.1.2/go.mod h1:OP4TM7xdJ2skyXqNX1AN1wN5nNZEmJNuWbNPOItn7aw=
 github.com/coreos/etcd v3.3.10+incompatible/go.mod h1:uF7uidLiAD3TWHmW31ZFd/JWoc32PjwdhPthX9715RE=
