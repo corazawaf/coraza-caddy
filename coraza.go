@@ -128,10 +128,14 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 
 	// We continue with the other middlewares by catching the response
 	if err := next.ServeHTTP(ww, r); err != nil {
-		return caddyhttp.HandlerError{
-			StatusCode: 500,
-			ID:         tx.ID(),
-			Err:        err,
+		if hErr, ok := err.(caddyhttp.HandlerError); ok {
+			return hErr
+		} else {
+			return caddyhttp.HandlerError{
+				StatusCode: 500,
+				ID:         tx.ID(),
+				Err:        err,
+			}
 		}
 	}
 
