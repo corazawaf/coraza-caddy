@@ -4,6 +4,7 @@
 package coraza
 
 import (
+	"errors"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -91,6 +92,8 @@ func (m *corazaModule) Validate() error {
 	return nil
 }
 
+var errInterruptionTriggered = errors.New("interruption triggered")
+
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	id := randomString(16)
@@ -115,35 +118,26 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	// It fails if any of these functions returns an error and it stops on interruption.
 	if it, err := processRequest(tx, r); err != nil {
 		return caddyhttp.HandlerError{
-			StatusCode: 500,
+			StatusCode: http.StatusInternalServerError,
 			ID:         tx.ID(),
 			Err:        err,
 		}
 	} else if it != nil {
-		w.WriteHeader(obtainStatusCodeFromInterruptionOrDefault(it, http.StatusOK))
-		return nil
+		return caddyhttp.HandlerError{
+			StatusCode: obtainStatusCodeFromInterruptionOrDefault(it, http.StatusOK),
+			ID:         tx.ID(),
+			Err:        errInterruptionTriggered,
+		}
 	}
 
 	ww, processResponse := wrap(w, r, tx)
 
 	// We continue with the other middlewares by catching the response
 	if err := next.ServeHTTP(ww, r); err != nil {
-		return caddyhttp.HandlerError{
-			StatusCode: 500,
-			ID:         tx.ID(),
-			Err:        err,
-		}
+		return err
 	}
 
-	if err := processResponse(tx, r); err != nil {
-		return caddyhttp.HandlerError{
-			StatusCode: 500,
-			ID:         tx.ID(),
-			Err:        err,
-		}
-	}
-
-	return nil
+	return processResponse(tx, r)
 }
 
 // Unmarshal Caddyfile implements caddyfile.Unmarshaler.
