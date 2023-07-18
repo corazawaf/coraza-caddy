@@ -41,7 +41,7 @@ func Format() error {
 	return sh.RunV("go", "run", fmt.Sprintf("github.com/rinchsan/gosimports/cmd/gosimports@%s", gosImportsVer),
 		"-w",
 		"-local",
-		"github.com/corazawaf/coraza-caddy",
+		"github.com/corazawaf/coraza-caddy/v2",
 		".")
 }
 
@@ -154,10 +154,16 @@ func buildCaddy(goos string) error {
 	if os.Getenv("CADDY_VERSION") != "" {
 		buildArgs = append(buildArgs, os.Getenv("CADDY_VERSION"))
 	}
-	buildArgs = append(buildArgs, "--with", "github.com/corazawaf/coraza-caddy=.",
+	buildArgs = append(buildArgs, "--with", "github.com/corazawaf/coraza-caddy/v2=.",
 		"--output", buildDir)
 
 	return sh.RunWithV(env, "xcaddy", buildArgs...)
+}
+
+// BuildExample builds the example deployment. Requires docker-compose.
+func BuildExample() error {
+	mg.SerialDeps(BuildCaddyLinux)
+	return sh.RunV("docker-compose", "--file", "example/docker-compose.yml", "build", "--no-cache", "caddy")
 }
 
 // RunExample spins up the test environment, access at http://localhost:8080. Requires docker-compose.

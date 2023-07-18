@@ -1,6 +1,6 @@
 services:
   httpbin:
-    image: mccutchen/go-httpbin:v2.5.0
+    image: mccutchen/go-httpbin:v2.9.0
     environment:
       - MAX_BODY_SIZE=15728640 # 15 MiB
     command: [ "/bin/go-httpbin", "-port", "8081" ]
@@ -26,6 +26,8 @@ services:
       - logs:/home/caddy/logs:rw
     ports:
       - 8080:8080
+    environment:
+      - HTTPBIN_HOST=httpbin
 
   caddy-logs:
     depends_on:

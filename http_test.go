@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/corazawaf/coraza/v3"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHTTP(t *testing.T) {
@@ -35,4 +36,9 @@ SecRule ARGS "456" "id:1,phase:2,deny,status:403"
 	if it != nil {
 		t.Error("transaction should be interrupted")
 	}
+}
+
+func TestParseServerName(t *testing.T) {
+	require.Equal(t, "www.example.com", parseServerName("www.example.com"))
+	require.Equal(t, "1.2.3.4", parseServerName("1.2.3.4:80"))
 }

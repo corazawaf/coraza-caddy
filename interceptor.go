@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/corazawaf/coraza/v3/types"
 )
 
@@ -128,15 +129,25 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 		}
 
 		if tx.IsResponseBodyAccessible() && tx.IsResponseBodyProcessable() {
-
 			if it, err := tx.ProcessResponseBody(); err != nil {
 				i.overrideWriteHeader(http.StatusInternalServerError)
 				i.flushWriteHeader()
-				return err
+
+				return caddyhttp.HandlerError{
+					ID:         tx.ID(),
+					StatusCode: http.StatusInternalServerError,
+					Err:        err,
+				}
 			} else if it != nil {
-				i.overrideWriteHeader(obtainStatusCodeFromInterruptionOrDefault(it, i.statusCode))
+				code := obtainStatusCodeFromInterruptionOrDefault(it, i.statusCode)
+				i.overrideWriteHeader(code)
 				i.flushWriteHeader()
-				return nil
+
+				return caddyhttp.HandlerError{
+					ID:         tx.ID(),
+					StatusCode: code,
+					Err:        errInterruptionTriggered,
+				}
 			}
 
 			// we release the buffer
@@ -144,7 +155,12 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 			if err != nil {
 				i.overrideWriteHeader(http.StatusInternalServerError)
 				i.flushWriteHeader()
-				return fmt.Errorf("failed to release the response body reader: %v", err)
+
+				return caddyhttp.HandlerError{
+					ID:         tx.ID(),
+					StatusCode: http.StatusInternalServerError,
+					Err:        fmt.Errorf("failed to release the response body reader: %v", err),
+				}
 			}
 
 			// this is the last opportunity we have to report the resolved status code
@@ -152,7 +168,11 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 			// response status code.)
 			i.flushWriteHeader()
 			if _, err := io.Copy(w, reader); err != nil {
-				return fmt.Errorf("failed to copy the response body: %v", err)
+				return caddyhttp.HandlerError{
+					ID:         tx.ID(),
+					StatusCode: http.StatusInternalServerError,
+					Err:        fmt.Errorf("failed to copy the response body: %v", err),
+				}
 			}
 		} else {
 			i.flushWriteHeader()
