@@ -15,7 +15,7 @@ OWASP Coraza WAF is 100% compatible with OWASP Coreruleset and Modsecurity synta
 ```bash
 ▶ go run mage.go -l
 Targets:
-  buildCaddy         Build builds the plugin.
+  buildCaddy        builds the plugin.
   buildCaddyLinux    BuildLinux builds the plugin with GOOS=linux.
   buildExample       builds the example deployment.
   check              runs lint and tests.
