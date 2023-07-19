@@ -132,12 +132,12 @@ func Check() {
 	mg.SerialDeps(Lint, Test)
 }
 
-// Build builds the plugin.
+// BuildCaddy builds the plugin.
 func BuildCaddy() error {
 	return buildCaddy("")
 }
 
-// BuildLinux builds the plugin with GOOS=linux.
+// BuildCaddyLinux builds the plugin with GOOS=linux.
 func BuildCaddyLinux() error {
 	return buildCaddy("linux")
 }
