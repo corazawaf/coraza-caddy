@@ -29,8 +29,6 @@ func TestPlugin(t *testing.T) {
 	if len(res.Header.Get("x-unique-id")) == 0 {
 		t.Error("X-Unique-Id header is not set")
 	}
-
-	time.Sleep(1 * time.Second)
 }
 
 func TestPluginReload(t *testing.T) {
