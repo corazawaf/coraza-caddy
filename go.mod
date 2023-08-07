@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/caddyserver/caddy/v2 v2.6.2
 	github.com/corazawaf/coraza-coreruleset v0.0.0-20230405190458-b4d2a6f6bdfc
-	github.com/corazawaf/coraza/v3 v3.0.2
+	github.com/corazawaf/coraza/v3 v3.0.3
 	github.com/jcchavezs/mergefs v0.0.0-20230405222254-20429875efdd
 	github.com/magefile/mage v1.15.0
 	github.com/stretchr/testify v1.8.2
@@ -131,6 +131,7 @@ require (
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/mod v0.8.0 // indirect
 	golang.org/x/net v0.11.0 // indirect
+	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.9.0 // indirect
 	golang.org/x/term v0.9.0 // indirect
 	golang.org/x/text v0.10.0 // indirect
