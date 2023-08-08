@@ -70,13 +70,28 @@ func Test() error {
 	return nil
 }
 
-// E2e runs e2e tests with a built plugin against the example deployment. Requires docker-compose.
+// E2e runs e2e tests with a built plugin against the e2e deployment. Requires docker-compose.
 func E2e() error {
 	var err error
-	if err = sh.RunV("docker-compose", "-f", "e2e/docker-compose.yml", "up", "--abort-on-container-exit", "tests"); err != nil {
-		sh.RunV("docker-compose", "-f", "e2e/docker-compose.yml", "logs", "caddy")
+	if err = sh.RunV("docker-compose", "-f", "e2e/docker-compose.yml", "up", "-d", "caddy"); err != nil {
+		return err
+	}
+	defer func() {
+		_ = sh.RunV("docker-compose", "--file", "e2e/docker-compose.yml", "down", "-v")
+	}()
+
+	caddyHost := os.Getenv("CADDY_HOST")
+	if caddyHost == "" {
+		caddyHost = "localhost:8080"
+	}
+	httpbinHost := os.Getenv("HTTPBIN_HOST")
+	if httpbinHost == "" {
+		httpbinHost = "localhost:8081"
 	}
 
+	if err = sh.RunV("go", "run", "github.com/corazawaf/coraza/v3/http/e2e/cmd/httpe2e@main", "--proxy-hostport", "http://"+caddyHost, "--httpbin-hostport", "http://"+httpbinHost); err != nil {
+		sh.RunV("docker-compose", "-f", "e2e/docker-compose.yml", "logs", "caddy")
+	}
 	return err
 }
 

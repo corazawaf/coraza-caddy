@@ -13,10 +13,5 @@ services:
       dockerfile: ./e2e/Dockerfile
     environment:
       - HTTPBIN_HOST=httpbin
-
-  tests:
-    depends_on:
-      - caddy
-    build:
-      context: ..
-      dockerfile: ./e2e/Dockerfile.curl
+    ports:
+      - 8080:8080
