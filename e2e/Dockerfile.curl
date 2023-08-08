@@ -1,7 +1,7 @@
 # Copyright 2022 The OWASP Coraza contributors
 # SPDX-License-Identifier: Apache-2.0
 
-FROM curlimages/curl
+FROM golang:1.20-alpine
 USER root
 
 WORKDIR /workspace
