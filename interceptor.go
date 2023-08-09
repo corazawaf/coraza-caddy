@@ -141,6 +141,7 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 			} else if it != nil {
 				code := obtainStatusCodeFromInterruptionOrDefault(it, i.statusCode)
 				i.overrideWriteHeader(code)
+				i.w.Header().Del("Content-Length")
 				i.flushWriteHeader()
 
 				return caddyhttp.HandlerError{

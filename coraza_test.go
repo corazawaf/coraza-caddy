@@ -26,8 +26,9 @@ func TestPlugin(t *testing.T) {
 		t.Fatal(err)
 	}
 	res, _ := tester.AssertGetResponse(baseURL+"/test", 200, "test123")
-	if len(res.Header.Get("x-unique-id")) == 0 {
-		t.Error("X-Unique-Id header is not set")
+	// Comes from https://github.com/corazawaf/coraza-caddy/blob/5e8337/test.init.config#L17
+	if len(res.Header.Get("x-request-id")) == 0 {
+		t.Fatal("X-Request-Id header is not set")
 	}
 
 	time.Sleep(1 * time.Second)
@@ -105,7 +106,6 @@ func TestPostMultipart(t *testing.T) {
 		t.Fatal(err)
 	}
 	tester.AssertResponseCode(req, 200)
-
 	time.Sleep(1 * time.Second)
 }
 
