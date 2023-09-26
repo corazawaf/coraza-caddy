@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/caddyserver/caddy/v2 v2.7.3
 	github.com/corazawaf/coraza-coreruleset v0.0.0-20230723190514-7bdcbcff3d5a
-	github.com/corazawaf/coraza/v3 v3.0.3
+	github.com/corazawaf/coraza/v3 v3.0.4
 	github.com/jcchavezs/mergefs v0.0.0-20230405222254-20429875efdd
 	github.com/magefile/mage v1.15.0
 	github.com/stretchr/testify v1.8.4
@@ -85,7 +85,7 @@ require (
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.5 // indirect
-	github.com/petar-dambovaliev/aho-corasick v0.0.0-20211021192214-5ab2d9280aa9 // indirect
+	github.com/petar-dambovaliev/aho-corasick v0.0.0-20230725210150-fb29fc3c913e // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
@@ -110,7 +110,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/tailscale/tscert v0.0.0-20230509043813-4e9cb4f2b4ad // indirect
-	github.com/tidwall/gjson v1.14.4 // indirect
+	github.com/tidwall/gjson v1.17.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/urfave/cli v1.22.14 // indirect
