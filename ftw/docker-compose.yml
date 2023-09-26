@@ -52,6 +52,7 @@ services:
       - caddy-logs
       - coraza-logs
     build:
+      context: .
       dockerfile: Dockerfile.ftw
     environment:
       - FTW_CLOUDMODE
