@@ -11,7 +11,6 @@ total_steps=1
 max_retries=15 # Seconds for the server reachability timeout
 host=${1:-caddy}
 health_url="http://${host}:8080"
-log_url="http://${host}:8080?arg=<script>alert(1)</script>"
 
 # Testing if the server is up
 echo "[$step/$total_steps] Testing application reachability"
