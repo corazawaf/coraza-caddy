@@ -1,12 +1,12 @@
 services:
   httpbin:
-    image: mccutchen/go-httpbin:v2.5.0
+    image: mccutchen/go-httpbin:v2.11.0
     command: [ "/bin/go-httpbin", "-port", "8081" ]
     ports:
       - 8081:8081
 
   chown:
-    image: alpine:3.16
+    image: alpine:3.18
     command:
       - /bin/sh
       - -c

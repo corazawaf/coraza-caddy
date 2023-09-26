@@ -1,20 +1,29 @@
 {
-    debug
-    auto_https off
-    order coraza_waf first
+	debug
+	auto_https off
+	order coraza_waf first
+	log {
+		output file "/home/caddy/logs/caddy.log"
+		level error # Printing only logs at error level to reduce what ftw has to parse
+		format console # ftw is looking for plain text logs
+		# Waf logs are logged to the output file. It includes the error logs generated when a rule is triggered.
+		# These are the logs that ftw is looking for
+		include "http.handlers.waf"
+	}
 }
 
 :8080 {
 	coraza_waf {
+		load_owasp_crs
 		directives `
-			Include @coraza.conf-recommended
-			# FTW config
-			SecDefaultAction "phase:3,log,auditlog,pass"
-			SecDefaultAction "phase:4,log,auditlog,pass"
-			SecDefaultAction "phase:5,log,auditlog,pass"
-			SecDebugLogLevel 3
+		Include @coraza.conf-recommended
+		# FTW config
+		SecDefaultAction "phase:3,log,auditlog,pass"
+		SecDefaultAction "phase:4,log,auditlog,pass"
+		SecDefaultAction "phase:5,log,auditlog,pass"
+		SecDebugLogLevel 3
 
-			SecAction "id:900005,\
+		SecAction "id:900005,\
 			phase:1,\
 			nolog,\
 			pass,\
@@ -29,8 +38,7 @@
 			setvar:tx.max_file_size=64100,\
 			setvar:tx.combined_file_sizes=65535"
 
-			SecRule REQUEST_HEADERS:X-CRS-Test "@rx ^.*$" \
-			"id:999999,\
+		SecRule REQUEST_HEADERS:X-CRS-Test "@rx ^.*$" "id:999999,\
 			phase:1,\
 			pass,\
 			t:none,\
@@ -38,14 +46,9 @@
 			msg:'X-CRS-Test %{MATCHED_VAR}',\
 			ctl:ruleRemoveById=1-999999"
 
-			Include @crs-setup.conf.example
-			Include @owasp_crs/*.conf
+		Include @crs-setup.conf.example
+		Include @owasp_crs/*.conf
 		`
 	}
-	# Only access logs are logged via log directive, ftw is looking for error logs
-	# log {
-	# 	output file /home/caddy/logs/caddy.log
-	# 	level error
-	# }
 	reverse_proxy httpbin:8081
 }

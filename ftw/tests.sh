@@ -8,9 +8,10 @@ cd /workspace
 
 step=1
 total_steps=1
-max_retries=15 #seconds for the server reachability timeout
+max_retries=15 # Seconds for the server reachability timeout
 host=${1:-caddy}
 health_url="http://${host}:8080"
+log_url="http://${host}:8080?arg=<script>alert(1)</script>"
 
 # Testing if the server is up
 echo "[$step/$total_steps] Testing application reachability"
@@ -36,4 +37,4 @@ FTW_CLOUDMODE=${FTW_CLOUDMODE:-false}
 
 FTW_INCLUDE=$([ "${FTW_INCLUDE}" == "" ] && echo "" || echo "-i ${FTW_INCLUDE}")
 
-/ftw run -d coreruleset/tests/regression/tests --config ftw.yml --read-timeout=10s --max-marker-retries=50 --cloud=$FTW_CLOUDMODE $FTW_INCLUDE || exit 1
+/ftw run -d coreruleset/tests/regression/tests --config ftw.yml --read-timeout=10s --max-marker-retries=50 --cloud=$FTW_CLOUDMODE $FTW_INCLUDE  || exit 1
