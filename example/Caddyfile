@@ -1,25 +1,29 @@
 {
-    debug
-    auto_https off
-    order coraza_waf first
+	debug
+	auto_https off
+	order coraza_waf first
+	log {
+		format console
+		level info
+	}
 }
 
 :8080 {
 	coraza_waf {
 		load_owasp_crs
 		directives `
-			Include @coraza.conf-recommended
-			Include @crs-setup.conf.example
-			Include @owasp_crs/*.conf
-			SecRuleEngine On
-			SecDebugLog /dev/stdout
-			SecDebugLogLevel 9
-		    SecRule REQUEST_URI "@streq /admin" "id:101,phase:1,t:lowercase,deny,status:403"
-			SecRule REQUEST_BODY "@rx maliciouspayload" "id:102,phase:2,t:lowercase,deny,status:403"
-			SecRule RESPONSE_HEADERS::status "@rx 406" "id:103,phase:3,t:lowercase,deny,status:403"
-			SecResponseBodyAccess On
-			SecResponseBodyMimeType application/json
-			SecRule RESPONSE_BODY "@contains responsebodycode" "id:104,phase:4,t:lowercase,deny,status:403"
+		Include @coraza.conf-recommended
+		Include @crs-setup.conf.example
+		Include @owasp_crs/*.conf
+		SecRuleEngine On
+		SecDebugLog /dev/stdout
+		SecDebugLogLevel 9
+		SecRule REQUEST_URI "@streq /admin" "id:101,phase:1,t:lowercase,deny,status:403"
+		SecRule REQUEST_BODY "@rx maliciouspayload" "id:102,phase:2,t:lowercase,deny,status:403"
+		SecRule RESPONSE_HEADERS::status "@rx 406" "id:103,phase:3,t:lowercase,deny,status:403"
+		SecResponseBodyAccess On
+		SecResponseBodyMimeType application/json
+		SecRule RESPONSE_BODY "@contains responsebodycode" "id:104,phase:4,t:lowercase,deny,status:403"
 		`
 	}
 	reverse_proxy {$HTTPBIN_HOST:localhost}:8081
