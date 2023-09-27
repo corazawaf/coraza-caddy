@@ -8,7 +8,7 @@ cd /workspace
 
 step=1
 total_steps=1
-max_retries=15 #seconds for the server reachability timeout
+max_retries=15 # Seconds for the server reachability timeout
 host=${1:-caddy}
 health_url="http://${host}:8080"
 

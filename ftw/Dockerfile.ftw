@@ -13,12 +13,6 @@ WORKDIR /workspace
 ADD https://github.com/coreruleset/coreruleset/tarball/477d8c3431d042294af2651f08d63d10b6f3fd60 /workspace/coreruleset/
 RUN cd coreruleset && tar -xf 477d8c3431d042294af2651f08d63d10b6f3fd60 --strip-components 1
 
-# Logs are written in json format, therefore we need to tweak the tests to match this output format
-# Replaces `id rule-id` with `id \"rule-id\"` across all tests
-RUN cd coreruleset/tests/regression/tests/ && find . -type f -name "*.yaml" -exec sed -r -i 's/id "([0-9]*)"/id \\\\"\1\\\\"/g' {} +
-# Replaces `"id \"rule-id\""` with `id \"rule-id\"` across all tests
-RUN cd coreruleset/tests/regression/tests/ && find . -type f -name "*.yaml" -exec sed -r -i 's/"id \\"([0-9]*)\\""/id \\\\\"\1\\\\\"/g' {} +
-
 COPY ftw.yml /workspace/ftw.yml
 COPY tests.sh /workspace/tests.sh
 
