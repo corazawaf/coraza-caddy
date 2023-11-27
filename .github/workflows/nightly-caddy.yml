@@ -5,6 +5,12 @@ on:
       - ".github/workflows/nightly-caddy.yml"
   schedule:
     - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      caddyversion:
+        description: "caddy version"
+        required: true
+        default: "master"
 
 jobs:
   nightly-caddy:
@@ -30,7 +36,7 @@ jobs:
         run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@${{ matrix.xcaddy-version }}
 
       - name: Build caddy
-        run: CADDY_VERSION=master go run mage.go buildCaddyLinux
+        run: CADDY_VERSION=${{ inputs.caddyversion }} go run mage.go buildCaddyLinux
 
       - name: Run e2e tests
         run: go run mage.go e2e
