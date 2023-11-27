@@ -42,6 +42,7 @@ func (i *rwInterceptor) WriteHeader(statusCode int) {
 	i.statusCode = statusCode
 
 	if it := i.tx.ProcessResponseHeaders(statusCode, i.proto); it != nil {
+		i.w.Header().Del("Content-Length")
 		i.statusCode = obtainStatusCodeFromInterruptionOrDefault(it, i.statusCode)
 		i.flushWriteHeader()
 		return
@@ -73,7 +74,11 @@ func (i *rwInterceptor) Write(b []byte) (int, error) {
 		// if there is an interruption it must be from at least phase 4 and hence
 		// WriteHeader or Write should have been called and hence the status code
 		// has been flushed to the delegated response writer.
-		return 0, nil
+		//
+		// We return the number of bytes as according to the interface io.Writer
+		// if we don't return an error, the number of bytes written is len(p).
+		// See https://pkg.go.dev/io#Writer
+		return len(b), nil
 	}
 
 	if !i.wroteHeader {
@@ -89,7 +94,11 @@ func (i *rwInterceptor) Write(b []byte) (int, error) {
 			i.overrideWriteHeader(it.Status)
 			// We only flush the status code after an interruption.
 			i.flushWriteHeader()
-			return 0, nil
+
+			// We return the number of bytes as according to the interface io.Writer
+			// if we don't return an error, the number of bytes written is len(p).
+			// See https://pkg.go.dev/io#Writer
+			return len(b), nil
 		}
 		return n, err
 	}

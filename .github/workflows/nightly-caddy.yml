@@ -13,6 +13,7 @@ on:
 
 jobs:
   nightly-caddy:
+    name: "Nightly Caddy (caddy version: ${{ github.event.inputs.caddyversion || 'master' }})"
     strategy:
       matrix:
         go-version: [1.20.x]
