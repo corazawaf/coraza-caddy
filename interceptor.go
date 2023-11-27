@@ -4,6 +4,7 @@
 package coraza
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -73,7 +74,7 @@ func (i *rwInterceptor) Write(b []byte) (int, error) {
 		// if there is an interruption it must be from at least phase 4 and hence
 		// WriteHeader or Write should have been called and hence the status code
 		// has been flushed to the delegated response writer.
-		return 0, nil
+		return 0, errors.New("response writer is interrupted")
 	}
 
 	if !i.wroteHeader {
@@ -89,7 +90,7 @@ func (i *rwInterceptor) Write(b []byte) (int, error) {
 			i.overrideWriteHeader(it.Status)
 			// We only flush the status code after an interruption.
 			i.flushWriteHeader()
-			return 0, nil
+			return 0, errors.New("response writer is interrupted")
 		}
 		return n, err
 	}
