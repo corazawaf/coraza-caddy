@@ -8,9 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       caddyversion:
-        description: "caddy version"
+        description: "caddy version (branch, tag or commit)"
         required: true
-        default: "master"
 
 jobs:
   nightly-caddy:
@@ -36,7 +35,7 @@ jobs:
         run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@${{ matrix.xcaddy-version }}
 
       - name: Build caddy
-        run: CADDY_VERSION=${{ inputs.caddyversion }} go run mage.go buildCaddyLinux
+        run: CADDY_VERSION=${{ github.event.inputs.caddyversion || 'master' }} go run mage.go buildCaddyLinux
 
       - name: Run e2e tests
         run: go run mage.go e2e
