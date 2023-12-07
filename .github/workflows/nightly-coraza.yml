@@ -21,7 +21,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
 
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           lfs: true
           fetch-depth: 0 #for better blame info
