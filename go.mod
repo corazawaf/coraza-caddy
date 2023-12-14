@@ -6,7 +6,7 @@ require (
 	github.com/caddyserver/caddy/v2 v2.7.6
 	github.com/corazawaf/coraza-coreruleset v0.0.0-20230723190514-7bdcbcff3d5a
 	github.com/corazawaf/coraza/v3 v3.0.4
-	github.com/jcchavezs/mergefs v0.0.0-20230405222254-20429875efdd
+	github.com/jcchavezs/mergefs v0.0.0-20230503083351-07f27d256761
 	github.com/magefile/mage v1.15.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.26.0
