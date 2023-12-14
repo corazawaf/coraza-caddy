@@ -33,7 +33,7 @@ services:
     depends_on:
       - caddy
       - coraza-logs
-    image: debian:11-slim
+    image: debian:12-slim
     entrypoint: bash
     command:
       - -c
@@ -44,7 +44,7 @@ services:
   coraza-logs:
     depends_on:
       - caddy
-    image: debian:11-slim
+    image: debian:12-slim
     entrypoint: bash
     command:
       - -c
