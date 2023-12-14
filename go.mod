@@ -40,7 +40,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/felixge/httpsnoop v1.0.3 // indirect
 	github.com/fxamacker/cbor/v2 v2.5.0 // indirect
-	github.com/go-chi/chi v4.1.2+incompatible // indirect
 	github.com/go-chi/chi/v5 v5.0.10 // indirect
 	github.com/go-kit/kit v0.10.0 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
@@ -49,7 +48,6 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/golang/glog v1.1.2 // indirect
-	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/cel-go v0.15.1 // indirect
@@ -128,7 +126,6 @@ require (
 	go.opentelemetry.io/contrib/propagators/jaeger v1.17.0 // indirect
 	go.opentelemetry.io/contrib/propagators/ot v1.17.0 // indirect
 	go.opentelemetry.io/otel v1.21.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.21.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.21.0 // indirect
 	go.opentelemetry.io/otel/metric v1.21.0 // indirect
@@ -149,7 +146,6 @@ require (
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/tools v0.10.0 // indirect
-	google.golang.org/genproto v0.0.0-20231012201019-e917dd12ba7a // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231016165738-49dd2c1f3d0b // indirect
 	google.golang.org/grpc v1.59.0 // indirect
