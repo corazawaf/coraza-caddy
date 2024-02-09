@@ -47,7 +47,7 @@ jobs:
       - name: Run regression tests (ftw)
         run: go run mage.go ftw
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: success() || failure()
         with:
           name: ftw-envoy-logs
