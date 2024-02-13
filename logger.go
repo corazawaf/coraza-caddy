@@ -33,11 +33,15 @@ func isZapNop(l *zap.Logger) bool {
 }
 
 func (l *logger) WithOutput(w io.Writer) debuglog.Logger {
-	if w == io.Discard || isZapNop(l.Logger) {
+	if w == io.Discard {
 		return &logger{
 			Logger: zap.NewNop(),
 			level:  l.level,
 		}
+	}
+
+	if isZapNop(l.Logger) {
+		return l
 	}
 
 	return &logger{
@@ -55,6 +59,12 @@ func (l *logger) WithOutput(w io.Writer) debuglog.Logger {
 }
 
 func (l *logger) WithLevel(level debuglog.Level) debuglog.Logger {
+	if level == debuglog.LevelNoLog {
+		return &logger{
+			Logger: zap.NewNop(),
+			level:  level,
+		}
+	}
 	return &logger{l.Logger, level}
 }
 
