@@ -26,7 +26,20 @@ func newLogger(l *zap.Logger) debuglog.Logger {
 	}
 }
 
+func isZapNop(l *zap.Logger) bool {
+	// As per zap documentation when a logger is created with NewNop() it will have
+	// an invalid level
+	return l.Level() == zapcore.InvalidLevel
+}
+
 func (l *logger) WithOutput(w io.Writer) debuglog.Logger {
+	if w == io.Discard || isZapNop(l.Logger) {
+		return &logger{
+			Logger: zap.NewNop(),
+			level:  l.level,
+		}
+	}
+
 	return &logger{
 		Logger: l.Logger.WithOptions(
 			zap.WrapCore(func(c zapcore.Core) zapcore.Core {
@@ -46,7 +59,7 @@ func (l *logger) WithLevel(level debuglog.Level) debuglog.Logger {
 }
 
 func (l *logger) With(fields ...debuglog.ContextField) debuglog.Logger {
-	if len(fields) == 0 {
+	if len(fields) == 0 || isZapNop(l.Logger) {
 		return l
 	}
 
