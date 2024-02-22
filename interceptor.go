@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/corazawaf/coraza/v3/types"
@@ -123,7 +124,7 @@ var _ http.ResponseWriter = (*rwInterceptor)(nil)
 // of the response body copyback from the transaction buffer.
 //
 // Heavily inspired in https://github.com/openzipkin/zipkin-go/blob/master/middleware/http/server.go#L218
-func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
+func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction, m corazaModule) (
 	http.ResponseWriter,
 	func(types.Transaction, *http.Request) error,
 ) { // nolint:gocyclo
@@ -152,6 +153,22 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 				i.overrideWriteHeader(code)
 				i.w.Header().Del("Content-Length")
 				i.flushWriteHeader()
+
+				if m.CustomResponseStatus == code && m.CustomResponseFile != "" {
+					w.Header().Set("Content-Type", "text/html")
+					w.WriteHeader(m.CustomResponseStatus)
+
+					h, err := os.ReadFile(m.CustomResponseFile)
+					if err != nil {
+						return caddyhttp.HandlerError{
+							ID:         tx.ID(),
+							StatusCode: http.StatusInternalServerError,
+							Err:        fmt.Errorf("failed to read custom response file: %v", err),
+						}
+					}
+					fmt.Fprintln(w, string(h))
+					return nil
+				}
 
 				return caddyhttp.HandlerError{
 					ID:         tx.ID(),

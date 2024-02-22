@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/caddyserver/caddy/v2"
@@ -29,9 +30,11 @@ func init() {
 // corazaModule is a Web Application Firewall implementation for Caddy.
 type corazaModule struct {
 	// deprecated
-	Include      []string `json:"include"`
-	Directives   string   `json:"directives"`
-	LoadOWASPCRS bool     `json:"load_owasp_crs"`
+	Include              []string `json:"include"`
+	Directives           string   `json:"directives"`
+	LoadOWASPCRS         bool     `json:"load_owasp_crs"`
+	CustomResponseStatus int      `json:"custom_response_status"`
+	CustomResponseFile   string   `json:"custom_response_file"`
 
 	logger *zap.Logger
 	waf    coraza.WAF
@@ -130,7 +133,7 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 		}
 	}
 
-	ww, processResponse := wrap(w, r, tx)
+	ww, processResponse := wrap(w, r, tx, m)
 
 	// We continue with the other middlewares by catching the response
 	if err := next.ServeHTTP(ww, r); err != nil {
@@ -172,6 +175,20 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			case "directives":
 				m.Directives = value
 			}
+		case "handle_custom_response":
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			statusCode, err := strconv.Atoi(d.Val())
+			if err != nil {
+				return d.Errf("invalid status code: %v", err)
+			}
+			m.CustomResponseStatus = statusCode
+
+			if !d.NextArg() {
+				return d.ArgErr()
+			}
+			m.CustomResponseFile = d.Val()
 		default:
 			return d.Errf("invalid key %q", key)
 		}
