@@ -9,3 +9,5 @@ __debug*
 .idea/
 
 build
+*.out
+coraza-caddy.test
