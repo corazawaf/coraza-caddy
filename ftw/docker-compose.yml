@@ -1,6 +1,6 @@
 services:
   httpbin:
-    image: mccutchen/go-httpbin:v2.13.4
+    image: mccutchen/go-httpbin:v2.14.0
     command: [ "/bin/go-httpbin", "-port", "8081" ]
     ports:
       - 8081:8081
