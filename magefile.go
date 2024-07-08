@@ -101,14 +101,19 @@ func Ftw() error {
 		return err
 	}
 	defer func() {
-		_ = sh.RunV("docker-compose", "--file", "ftw/docker-compose.yml", "down", "-v")
+		_ = sh.RunV("docker-compose", "--file", "ftw/docker-compose.yml", "down", "--volumes", "--rmi", "local")
 	}()
 	env := map[string]string{
 		"FTW_CLOUDMODE": os.Getenv("FTW_CLOUDMODE"),
 		"FTW_INCLUDE":   os.Getenv("FTW_INCLUDE"),
 	}
-	task := "ftw"
-	return sh.RunWithV(env, "docker-compose", "--file", "ftw/docker-compose.yml", "run", "--rm", task)
+
+	err := sh.RunWithV(env, "docker-compose", "--file", "ftw/docker-compose.yml", "run", "ftw")
+	if err != nil {
+		sh.RunV("docker-compose", "--file", "ftw/docker-compose.yml", "logs", "caddy-logs", "coraza-logs")
+	}
+
+	return err
 }
 
 // Coverage runs tests with coverage and race detector enabled.
@@ -158,6 +163,10 @@ func BuildCaddyLinux() error {
 }
 
 func buildCaddy(goos string) error {
+	if err := sh.Run("which", "xcaddy"); err != nil {
+		return errors.New("xcaddy not found, install it with 'go install github.com/caddyserver/xcaddy/cmd/xcaddy'")
+	}
+
 	env := map[string]string{}
 	buildDir := "build/caddy"
 	if goos != "" {
