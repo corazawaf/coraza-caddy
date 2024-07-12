@@ -2,7 +2,7 @@ module github.com/corazawaf/coraza-caddy/v2
 
 go 1.21.0
 
-toolchain go1.22.5
+toolchain go1.21.11
 
 require (
 	github.com/caddyserver/caddy/v2 v2.8.4
