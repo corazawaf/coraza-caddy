@@ -24,6 +24,7 @@ services:
       dockerfile: ./example/Dockerfile
     volumes:
       - logs:/home/caddy/logs:rw
+      - ./403.html:/etc/caddy/custom-pages/403.html:ro
     ports:
       - 8080:8080
     environment:
