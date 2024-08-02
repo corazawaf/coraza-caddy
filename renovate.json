@@ -8,5 +8,8 @@
     "group:recommended",
     "replacements:all",
     "workarounds:all"
-  ]
+  ],
+  "constraints": {
+    "go": "1.21"
+  }
 }
