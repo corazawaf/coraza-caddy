@@ -125,3 +125,27 @@ go run mage.go buildCaddy
 # in terminal 3
 curl -i localhost:8080/
 ```
+
+## Respond with custom message or HTML page
+
+In order to respond with a custom message or HTML page, you can take advantage of [handle_errors](https://caddyserver.com/docs/caddyfile/directives/handle_errors) directive:
+
+```caddy
+handle_errors 403 {
+ header X-Blocked "true"
+ respond "Your request was blocked. Request ID: {http.request.header.x-request-id}"
+}
+```
+or
+```caddy
+handle_errors {
+ @block_codes `{err.status_code} in [403]`
+ handle @block_codes {
+  root    * /path/to/html/dir
+  rewrite * /{err.status_code}.html
+  file_server
+ }
+}
+```
+
+It is possible to use the [templates](https://caddyserver.com/docs/caddyfile/directives/templates) directive to render data dynamically. Take a look at [`example/403.html`](./example/403.html) file.  
