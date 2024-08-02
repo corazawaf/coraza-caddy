@@ -26,5 +26,14 @@
 		SecRule RESPONSE_BODY "@contains responsebodycode" "id:104,phase:4,t:lowercase,deny,status:403"
 		`
 	}
+
+    handle_errors 403 {
+        header X-Blocked "true"
+        root    * /etc/caddy/custom-pages
+        rewrite * /{err.status_code}.html
+        file_server
+        templates
+    }
+
 	reverse_proxy {$HTTPBIN_HOST:localhost}:8081
 }
