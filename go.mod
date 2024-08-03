@@ -6,7 +6,7 @@ toolchain go1.21.12
 
 require (
 	github.com/caddyserver/caddy/v2 v2.8.4
-	github.com/corazawaf/coraza-coreruleset v0.0.0-20230723190514-7bdcbcff3d5a
+	github.com/corazawaf/coraza-coreruleset/v4 v4.5.0
 	github.com/corazawaf/coraza/v3 v3.2.1
 	github.com/jcchavezs/mergefs v0.0.0-20230503083351-07f27d256761
 	github.com/magefile/mage v1.15.0

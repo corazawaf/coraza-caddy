@@ -85,7 +85,7 @@ go run mage.go test
 
 ## Using OWASP Core Ruleset
 
-You can load OWASP CRS by passing the field `load_owasp_crs` and then load the CRS files in the directives as described in the [coraza-coreruleset](https://github.com/corazawaf/coraza-coreruleset) documentation.
+You can load OWASP CRS by passing the field `load_owasp_crs` and then load the CRS files in the directives as described in the [coraza-coreruleset](https://github.com/corazawaf/coraza-coreruleset/v4) documentation.
 
 ```caddy
 :8080 {

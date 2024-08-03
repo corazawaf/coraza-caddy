@@ -1,7 +1,7 @@
 services:
-  httpbin:
-    image: mccutchen/go-httpbin:v2.14.0
-    command: [ "/bin/go-httpbin", "-port", "8081" ]
+  backend:
+    image: ghcr.io/coreruleset/albedo:0.0.15
+    command: ["--port", "8081"]
     ports:
       - 8081:8081
 
@@ -10,13 +10,14 @@ services:
     command:
       - /bin/sh
       - -c
-      - chown -R 101:101 /home/caddy/logs
+      - touch /home/caddy/logs/caddy.log && chown -R 101:101 /home/caddy/logs
     volumes:
       - logs:/home/caddy/logs:rw
+
   caddy:
     depends_on:
       - chown
-      - httpbin
+      - backend
     build:
       context: ..
       dockerfile: ./ftw/Dockerfile.caddy
@@ -26,6 +27,7 @@ services:
       - logs:/home/caddy/logs:rw
     ports:
       - 8080:8080
+
   coraza-logs:
     depends_on:
       - caddy
@@ -36,6 +38,7 @@ services:
       - tail -c +0 -f /home/caddy/logs/caddy.log | grep --line-buffered "http.handlers.waf" > /home/caddy/logs/ftw.log
     volumes:
       - logs:/home/caddy/logs:rw
+
   caddy-logs:
     depends_on:
       - caddy
@@ -47,6 +50,7 @@ services:
     volumes:
       - logs:/home/caddy/logs:ro
       - ../build:/build
+
   ftw:
     depends_on:
       - caddy-logs

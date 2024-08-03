@@ -107,6 +107,7 @@ func Ftw() error {
 		"FTW_CLOUDMODE": os.Getenv("FTW_CLOUDMODE"),
 		"FTW_INCLUDE":   os.Getenv("FTW_INCLUDE"),
 	}
+
 	task := "ftw"
 	return sh.RunWithV(env, "docker", "compose", "--file", "ftw/docker-compose.yml", "run", "--rm", task)
 }
@@ -158,6 +159,10 @@ func BuildCaddyLinux() error {
 }
 
 func buildCaddy(goos string) error {
+	if err := sh.Run("which", "xcaddy"); err != nil {
+		return errors.New("xcaddy not found, install it with 'go install github.com/caddyserver/xcaddy/cmd/xcaddy'")
+	}
+
 	env := map[string]string{}
 	buildDir := "build/caddy"
 	if goos != "" {
