@@ -3,8 +3,10 @@
 	auto_https off
 	order coraza_waf first
 	log {
+		output stdout
 		format console
-		level info
+		level debug
+		include "http.handlers.waf"
 	}
 }
 
@@ -20,20 +22,20 @@
 		SecDebugLogLevel 9
 		SecRule REQUEST_URI "@streq /admin" "id:101,phase:1,t:lowercase,deny,status:403"
 		SecRule REQUEST_BODY "@rx maliciouspayload" "id:102,phase:2,t:lowercase,deny,status:403"
-		SecRule RESPONSE_HEADERS::status "@rx 406" "id:103,phase:3,t:lowercase,deny,status:403"
+		SecRule RESPONSE_STATUS "@rx 406" "id:103,phase:3,t:lowercase,deny,status:403"
 		SecResponseBodyAccess On
 		SecResponseBodyMimeType application/json
 		SecRule RESPONSE_BODY "@contains responsebodycode" "id:104,phase:4,t:lowercase,deny,status:403"
 		`
 	}
 
-    handle_errors 403 {
-        header X-Blocked "true"
-        root    * /etc/caddy/custom-pages
-        rewrite * /{err.status_code}.html
-        file_server
-        templates
-    }
+	handle_errors 403 {
+		header X-Blocked "true"
+		root * /etc/caddy/custom-pages
+		rewrite * /{err.status_code}.html
+		file_server
+		templates
+	}
 
 	reverse_proxy {$HTTPBIN_HOST:localhost}:8081
 }
