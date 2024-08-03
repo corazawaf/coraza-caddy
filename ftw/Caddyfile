@@ -50,5 +50,5 @@
 		Include @owasp_crs/*.conf
 		`
 	}
-	reverse_proxy httpbin:8081
+	reverse_proxy backend:8081
 }

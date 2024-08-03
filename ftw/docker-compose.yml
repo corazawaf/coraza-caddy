@@ -1,7 +1,7 @@
 services:
-  httpbin:
-    image: mccutchen/go-httpbin:v2.14.0
-    command: [ "/bin/go-httpbin", "-port", "8081" ]
+  backend:
+    image: ghcr.io/coreruleset/albedo:0.0.15
+    command: ["--port", "8081"]
     ports:
       - 8081:8081
 
@@ -17,7 +17,7 @@ services:
   caddy:
     depends_on:
       - chown
-      - httpbin
+      - backend
     build:
       context: ..
       dockerfile: ./ftw/Dockerfile.caddy
