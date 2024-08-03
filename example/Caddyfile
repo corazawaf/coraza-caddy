@@ -17,6 +17,9 @@
 		Include @coraza.conf-recommended
 		Include @crs-setup.conf.example
 		Include @owasp_crs/*.conf
+		SecDefaultAction "phase:3,log,auditlog,pass"
+		SecDefaultAction "phase:4,log,auditlog,pass"
+		SecDefaultAction "phase:5,log,auditlog,pass"
 		SecRuleEngine On
 		SecDebugLog /dev/stdout
 		SecDebugLogLevel 9
