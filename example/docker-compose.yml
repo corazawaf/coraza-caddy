@@ -1,6 +1,6 @@
 services:
   httpbin:
-    image: mccutchen/go-httpbin:v2.14.0
+    image: mccutchen/go-httpbin:v2.15.0
     environment:
       - MAX_BODY_SIZE=15728640 # 15 MiB
     command: [ "/bin/go-httpbin", "-port", "8081" ]
