@@ -188,7 +188,7 @@ func BuildExample() error {
 
 // RunExample spins up the test environment, access at http://localhost:8080. Requires docker.
 func RunExample() error {
-	return sh.RunV("docker", "compose", "--file", "example/docker-compose.yml", "up", "-d", "caddy-logs")
+	return sh.RunV("docker", "compose", "--file", "example/docker-compose.yml", "up", "-d", "caddy")
 }
 
 // TeardownExample tears down the test environment. Requires docker.
