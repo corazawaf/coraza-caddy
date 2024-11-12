@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ghcr.io/coreruleset/albedo:0.0.15
+    image: ghcr.io/coreruleset/albedo:0.0.16
     command: ["--port", "8081"]
     ports:
       - 8081:8081
