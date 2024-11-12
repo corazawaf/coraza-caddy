@@ -1,14 +1,12 @@
 module github.com/corazawaf/coraza-caddy/v2
 
-go 1.21.0
-
-toolchain go1.21.12
+go 1.22.0
 
 require (
 	github.com/caddyserver/caddy/v2 v2.8.4
 	github.com/corazawaf/coraza-coreruleset/v4 v4.5.0
 	github.com/corazawaf/coraza/v3 v3.2.1
-	github.com/jcchavezs/mergefs v0.0.0-20230503083351-07f27d256761
+	github.com/jcchavezs/mergefs v0.1.0
 	github.com/magefile/mage v1.15.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
