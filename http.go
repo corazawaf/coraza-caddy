@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/corazawaf/coraza/v3/types"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
 // Copied from https://github.com/corazawaf/coraza/blob/main/http/middleware.go
@@ -26,6 +27,16 @@ func processRequest(tx types.Transaction, req *http.Request) (*types.Interruptio
 	if idx != -1 {
 		client = req.RemoteAddr[:idx]
 		cport, _ = strconv.Atoi(req.RemoteAddr[idx+1:])
+	}
+	address := caddyhttp.GetVar(req.Context(), caddyhttp.ClientIPVarKey).(string)
+	clientIp, clientPort, _ := net.SplitHostPort(address)
+	if clientIp != "" {
+		client = clientIp
+	} else if address != "" {
+		client = address
+	}
+	if clientPort != "" {
+		cport, _ = strconv.Atoi(clientPort)
 	}
 
 	var in *types.Interruption
