@@ -4,7 +4,11 @@
 package coraza
 
 import (
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"math/rand"
+	"net"
+	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,4 +48,34 @@ func randomString(n int) string {
 	mu.Unlock()
 
 	return sb.String()
+}
+
+func getClientAddress(req *http.Request) (string, int) {
+
+	var (
+		clientIp   string
+		clientPort int
+	)
+
+	if address, ok := caddyhttp.GetVar(req.Context(), caddyhttp.ClientIPVarKey).(string); ok && len(address) > 0 {
+		ip, port, _ := net.SplitHostPort(address)
+		if ip != "" {
+			clientIp = ip
+		} else {
+			clientIp = address
+		}
+		clientPort, _ = strconv.Atoi(port)
+	} else {
+		idx := strings.LastIndexByte(req.RemoteAddr, ':')
+		if idx != -1 {
+			clientIp = req.RemoteAddr[:idx]
+			clientPort, _ = strconv.Atoi(req.RemoteAddr[idx+1:])
+		} else {
+		    clientIp = req.RemoteAddr
+		    clientPort = 0
+		}
+	}
+
+	return clientIp, clientPort
+
 }
