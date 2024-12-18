@@ -28,16 +28,17 @@ func processRequest(tx types.Transaction, req *http.Request) (*types.Interruptio
 		client = req.RemoteAddr[:idx]
 		cport, _ = strconv.Atoi(req.RemoteAddr[idx+1:])
 	}
-	address := caddyhttp.GetVar(req.Context(), caddyhttp.ClientIPVarKey).(string)
-	clientIp, clientPort, _ := net.SplitHostPort(address)
-	if clientIp != "" {
-		client = clientIp
-	} else if address != "" {
-		client = address
-	}
-	if clientPort != "" {
-		cport, _ = strconv.Atoi(clientPort)
-	}
+    if address, ok := caddyhttp.GetVar(req.Context(), caddyhttp.ClientIPVarKey).(string); ok {
+        clientIp, clientPort, _ := net.SplitHostPort(address)
+        if clientIp != "" {
+            client = clientIp
+        } else if address != "" {
+            client = address
+        }
+        if clientPort != "" {
+            cport, _ = strconv.Atoi(clientPort)
+        }
+    }
 
 	var in *types.Interruption
 	// There is no socket access in the request object, so we neither know the server client nor port.
