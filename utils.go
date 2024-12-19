@@ -4,7 +4,6 @@
 package coraza
 
 import (
-	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"math/rand"
 	"net"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 )
 
 const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -71,8 +72,8 @@ func getClientAddress(req *http.Request) (string, int) {
 			clientIp = req.RemoteAddr[:idx]
 			clientPort, _ = strconv.Atoi(req.RemoteAddr[idx+1:])
 		} else {
-		    clientIp = req.RemoteAddr
-		    clientPort = 0
+			clientIp = req.RemoteAddr
+			clientPort = 0
 		}
 	}
 
