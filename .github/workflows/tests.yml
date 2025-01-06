@@ -50,5 +50,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: success() || failure()
         with:
-          name: ftw-envoy-logs
-          path: build/ftw-envoy.log
+          name: ftw-caddy-logs
+          path: build/ftw-caddy.log
