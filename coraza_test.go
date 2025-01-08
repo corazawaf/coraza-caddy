@@ -115,13 +115,13 @@ func TestClientIpRule(t *testing.T) {
 		t.Fatal(err)
 	}
 
-    // client_ip will be 127.0.0.1
-    req, _ := http.NewRequest("GET", baseURL+"/", nil)
-    tester.AssertResponseCode(req, 200)
+	// client_ip will be 127.0.0.1
+	req, _ := http.NewRequest("GET", baseURL+"/", nil)
+	tester.AssertResponseCode(req, 200)
 
-    time.Sleep(1 * time.Second)
+	time.Sleep(1 * time.Second)
 
-    // client_ip will be 127.0.0.2
+	// client_ip will be 127.0.0.2
 	req, _ = http.NewRequest("GET", baseURL+"/", nil)
 	req.Header.Add("X-Forwarded-For", "127.0.0.2")
 	tester.AssertResponseCode(req, 403)
