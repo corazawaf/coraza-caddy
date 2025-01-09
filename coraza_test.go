@@ -1,11 +1,10 @@
-// Copyright 2023 The OWASP Coraza contributors
+// Copyright 2025 The OWASP Coraza contributors
 // SPDX-License-Identifier: Apache-2.0
 
 package coraza
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -79,9 +78,35 @@ func TestPostMultipart(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", baseURL+"/", nil)
 
-	err := multipartRequest(t, req)
-	require.NoError(t, err)
+	fillRequestWithMultipartContent(t, req)
+
 	tester.AssertResponseCode(req, 200)
+}
+
+func fillRequestWithMultipartContent(t *testing.T, req *http.Request) {
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+	tempfile, err := os.CreateTemp(t.TempDir(), "tmpfile*")
+	require.NoError(t, err)
+
+	for i := 0; i < 1024*5; i++ {
+		// this should create a 5mb file
+		_, err := tempfile.Write([]byte(strings.Repeat("A", 1024)))
+		require.NoError(t, err)
+	}
+	var fw io.Writer
+	fw, err = w.CreateFormFile("fupload", tempfile.Name())
+	require.NoError(t, err)
+
+	_, err = tempfile.Seek(0, 0)
+	require.NoError(t, err)
+
+	_, err = io.Copy(fw, tempfile)
+	require.NoError(t, err)
+
+	req.Body = io.NopCloser(&b)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Method = "POST"
 }
 
 func TestClientIpRule(t *testing.T) {
@@ -95,37 +120,6 @@ func TestClientIpRule(t *testing.T) {
 	req, _ = http.NewRequest("GET", baseURL+"/", nil)
 	req.Header.Add("X-Forwarded-For", "127.0.0.2")
 	tester.AssertResponseCode(req, 403)
-}
-
-func multipartRequest(t *testing.T, req *http.Request) error {
-	t.Helper()
-	var b bytes.Buffer
-	w := multipart.NewWriter(&b)
-	tempfile, err := os.CreateTemp(t.TempDir(), "tmpfile*")
-	if err != nil {
-		return fmt.Errorf("creating multipart file: %w", err)
-	}
-
-	for i := 0; i < 1024*5; i++ {
-		// this should create a 5mb file
-		if _, err := tempfile.Write([]byte(strings.Repeat("A", 1024))); err != nil {
-			return fmt.Errorf("writing to multipart file: %w", err)
-		}
-	}
-	var fw io.Writer
-	if fw, err = w.CreateFormFile("fupload", tempfile.Name()); err != nil {
-		return fmt.Errorf("creating form file: %w", err)
-	}
-	if _, err := tempfile.Seek(0, 0); err != nil {
-		return fmt.Errorf("seeking to start of file: %w", err)
-	}
-	if _, err = io.Copy(fw, tempfile); err != nil {
-		return fmt.Errorf("copying file to form file: %w", err)
-	}
-	req.Body = io.NopCloser(&b)
-	req.Header.Set("Content-Type", w.FormDataContentType())
-	req.Method = "POST"
-	return nil
 }
 
 func newTester(caddyfile string, t *testing.T) *caddytest.Tester {
@@ -184,9 +178,7 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 			err := m.UnmarshalCaddyfile(dispenser)
 			if test.shouldErr {
 				require.Error(t, err)
-			}
-
-			if !test.shouldErr {
+			} else {
 				require.NoError(t, err)
 			}
 		})

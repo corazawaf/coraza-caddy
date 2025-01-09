@@ -1,4 +1,4 @@
-// Copyright 2023 The OWASP Coraza contributors
+// Copyright 2025 The OWASP Coraza contributors
 // SPDX-License-Identifier: Apache-2.0
 
 package coraza
