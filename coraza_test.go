@@ -84,9 +84,21 @@ func TestPostMultipart(t *testing.T) {
 	tester.AssertResponseCode(req, 200)
 }
 
+func TestClientIpRule(t *testing.T) {
+	tester := newTester("test.init.config", t)
+
+	// client_ip will be 127.0.0.1
+	req, _ := http.NewRequest("GET", baseURL+"/", nil)
+	tester.AssertResponseCode(req, 200)
+
+	// client_ip will be 127.0.0.2
+	req, _ = http.NewRequest("GET", baseURL+"/", nil)
+	req.Header.Add("X-Forwarded-For", "127.0.0.2")
+	tester.AssertResponseCode(req, 403)
+}
+
 func multipartRequest(t *testing.T, req *http.Request) error {
 	t.Helper()
-
 	var b bytes.Buffer
 	w := multipart.NewWriter(&b)
 	tempfile, err := os.CreateTemp(t.TempDir(), "tmpfile*")
