@@ -8,8 +8,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"strconv"
-	"strings"
 
 	"github.com/corazawaf/coraza/v3/types"
 )
@@ -17,16 +15,8 @@ import (
 // Copied from https://github.com/corazawaf/coraza/blob/main/http/middleware.go
 
 func processRequest(tx types.Transaction, req *http.Request) (*types.Interruption, error) {
-	var (
-		client string
-		cport  int
-	)
-	// IMPORTANT: Some http.Request.RemoteAddr implementations will not contain port or contain IPV6: [2001:db8::1]:8080
-	idx := strings.LastIndexByte(req.RemoteAddr, ':')
-	if idx != -1 {
-		client = req.RemoteAddr[:idx]
-		cport, _ = strconv.Atoi(req.RemoteAddr[idx+1:])
-	}
+
+	client, cport := getClientAddress(req)
 
 	var in *types.Interruption
 	// There is no socket access in the request object, so we neither know the server client nor port.
