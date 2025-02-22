@@ -1,6 +1,6 @@
 module github.com/corazawaf/coraza-caddy/v2
 
-go 1.22.0
+go 1.23.6
 
 require (
 	github.com/caddyserver/caddy/v2 v2.8.4

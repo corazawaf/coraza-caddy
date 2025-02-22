@@ -10,7 +10,7 @@ jobs:
   nightly-coraza:
     strategy:
       matrix:
-        go-version: [1.22.x]
+        go-version: [1.23.x]
         os: [ubuntu-latest]
         xcaddy-version: [v0.3.5]
     runs-on: ${{ matrix.os }}
