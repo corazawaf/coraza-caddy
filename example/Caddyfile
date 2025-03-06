@@ -10,7 +10,7 @@
 	}
 }
 
-:8080 {
+(waf) {
 	coraza_waf {
 		load_owasp_crs
 		directives `
@@ -42,6 +42,14 @@
 		file_server
 		templates
 	}
+}
 
+:8080 {
+	import waf
 	reverse_proxy {$HTTPBIN_HOST:localhost}:8081
 }
+
+# waf-test.example.com {
+#	import waf
+#	reverse_proxy 192.0.2.80:8080
+# }
