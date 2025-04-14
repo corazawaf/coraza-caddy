@@ -95,6 +95,9 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	id := randomString(16)
 	tx := m.waf.NewTransactionWithID(id)
 	defer func() {
+		if tx.IsInterrupted() {
+			m.logger = m.logger.With(zap.String("host", r.Host))
+		}
 		tx.ProcessLogging()
 		_ = tx.Close()
 	}()
