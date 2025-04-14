@@ -95,8 +95,21 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	tx := m.waf.NewTransaction()
 	defer func() {
 		if tx.IsInterrupted() {
-			// Get unique_id from transaction variables
-			uniqueID := tx.Variables().GetCollection(types.VARIABLE_UNIQUE_ID).Get("UNIQUE_ID")
+			// Get the unique_id from the matched rules
+			var uniqueID string
+			for _, rule := range tx.MatchedRules() {
+				if meta := rule.ErrorLog(403); meta != "" {
+					// Extract unique_id from the error log
+					if idx := strings.Index(meta, "[unique_id \""); idx != -1 {
+						end := strings.Index(meta[idx:], "\"]")
+						if end != -1 {
+							uniqueID = meta[idx+12 : idx+end]
+							break
+						}
+					}
+				}
+			}
+
 			m.logger.Error("WAF rule violation detected",
 				zap.String("hostname", r.Host),
 				zap.String("uri", r.RequestURI),
