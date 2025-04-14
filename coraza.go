@@ -92,14 +92,17 @@ func (m *corazaModule) Validate() error {
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	var err error
-	id := randomString(16)
-	tx := m.waf.NewTransactionWithID(id)
+	tx := m.waf.NewTransaction()
 	defer func() {
 		if tx.IsInterrupted() {
+			// Get unique_id from transaction data
+			uniqueID := tx.GetCollection(types.UNIQUE_ID).Get("UNIQUE_ID")
+
+			// Log hostname with unique_id and better message
 			m.logger.Error("WAF rule violation detected",
 				zap.String("hostname", r.Host),
 				zap.String("uri", r.RequestURI),
-				zap.String("unique_id", tx.ID()),
+				zap.String("unique_id", uniqueID),
 				zap.String("client_ip", r.RemoteAddr),
 			)
 		}
@@ -107,14 +110,14 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 		_ = tx.Close()
 	}()
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
-	repl.Set("http.transaction_id", id)
+	repl.Set("http.transaction_id", tx.ID())
 
 	it, err := processRequest(tx, r)
 	if err != nil {
 		return err
 	}
 	if it != nil {
-		return interrupt(nil, tx, id)
+		return interrupt(nil, tx, tx.ID())
 	}
 
 	rec := newStreamRecorder(w, tx)
@@ -124,7 +127,7 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	}
 	// If the response was interrupted during phase 3 or 4 we can stop the response
 	if tx.IsInterrupted() {
-		return interrupt(nil, tx, id)
+		return interrupt(nil, tx, tx.ID())
 	}
 	if !rec.Buffered() {
 		//Nothing to do, response was already sent to the client
