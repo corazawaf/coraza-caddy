@@ -103,27 +103,21 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 				clientIP = clientIP[:idx]
 			}
 
-			// First try to find the blocking rule (usually anomaly scoring rule)
+			// First try to find the blocking rule
 			for _, rule := range matchedRules {
-				if rule.Rule().ID() == 949110 {
-					ruleID = fmt.Sprintf("%d", rule.Rule().ID())
-					ruleFile = rule.Rule().File()
-					if meta := rule.ErrorLog(403); meta != "" {
-						if idx := strings.Index(meta, "[unique_id \""); idx != -1 {
-							end := strings.Index(meta[idx:], "\"]")
-							if end != -1 {
-								uniqueID = meta[idx+12 : idx+end]
-							}
+				meta := rule.ErrorLog(403)
+				// Look for unique_id in any rule that has it
+				if meta != "" {
+					if idx := strings.Index(meta, "[unique_id \""); idx != -1 {
+						end := strings.Index(meta[idx:], "\"]")
+						if end != -1 {
+							uniqueID = meta[idx+12 : idx+end]
 						}
 					}
-					break
 				}
-			}
-			// If we didn't find the blocking rule, fall back to the last matched rule
-			if ruleID == "" && len(matchedRules) > 0 {
-				lastRule := matchedRules[len(matchedRules)-1]
-				ruleID = fmt.Sprintf("%d", lastRule.Rule().ID())
-				ruleFile = lastRule.Rule().File()
+				// Always capture the last rule's ID and file
+				ruleID = fmt.Sprintf("%d", rule.Rule().ID())
+				ruleFile = rule.Rule().File()
 			}
 
 			m.logger.Error("WAF rule violation detected",
