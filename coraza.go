@@ -103,9 +103,9 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 				clientIP = clientIP[:idx]
 			}
 
-			// First try to find the blocking rule (usually anomaly scoring rules)
+			// First try to find the blocking rule (usually anomaly scoring rule)
 			for _, rule := range matchedRules {
-				if rule.Rule().ID() == 949110 || strings.Contains(rule.Rule().Message(), "Anomaly Score Exceeded") {
+				if rule.Rule().ID() == 949110 {
 					ruleID = fmt.Sprintf("%d", rule.Rule().ID())
 					ruleFile = rule.Rule().File()
 					if meta := rule.ErrorLog(403); meta != "" {
@@ -129,7 +129,7 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 			m.logger.Error("WAF rule violation detected",
 				zap.String("hostname", r.Host),
 				zap.String("uri", r.RequestURI),
-				zap.String("client_ip", r.RemoteAddr),
+				zap.String("client_ip", clientIP),
 				zap.String("unique_id", uniqueID),
 				zap.String("rule_id", ruleID),
 				zap.String("rule_file", ruleFile),
