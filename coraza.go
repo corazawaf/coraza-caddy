@@ -95,8 +95,8 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	tx := m.waf.NewTransaction()
 	defer func() {
 		if tx.IsInterrupted() {
-			// Get the unique_id from the matched rules
-			var uniqueID string
+			// Get information from the first matched rule that caused interruption
+			var uniqueID, ruleID, ruleFile string
 			for _, rule := range tx.MatchedRules() {
 				if meta := rule.ErrorLog(403); meta != "" {
 					// Extract unique_id from the error log
@@ -108,6 +108,10 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 						}
 					}
 				}
+				// Get rule ID and file
+				ruleID = fmt.Sprintf("%d", rule.Rule().ID())
+				ruleFile = rule.Rule().File()
+				break
 			}
 
 			m.logger.Error("WAF rule violation detected",
@@ -115,6 +119,8 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 				zap.String("uri", r.RequestURI),
 				zap.String("client_ip", r.RemoteAddr),
 				zap.String("unique_id", uniqueID),
+				zap.String("rule_id", ruleID),
+				zap.String("rule_file", ruleFile),
 			)
 		}
 		tx.ProcessLogging()
