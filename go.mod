@@ -1,4 +1,4 @@
-module github.com/corazawaf/coraza-caddy/v2
+module github.com/Stonework4292/coraza-caddy
 
 go 1.23.0
 
