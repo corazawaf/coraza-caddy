@@ -15,6 +15,10 @@ testoverride:
     920430-5: 'Test has expect_error, Go/http and Envoy return 400'
     920430-8: 'Go/http does no allow HTTP/3.0 - 505 HTTP Version Not Supported'
 
+    # Failing tests related to upstream issues:
+    921250-1: 'Expected to match $Version in cookies, failing also in upstream'
+    921250-2: 'Expected to match $Version in cookies, failing also in upstream'
+
     # TODO investigate failing tests:
     920100-10: ''
     920100-14: ''
@@ -69,8 +73,9 @@ testoverride:
     920430-9: ''
     920610-2: ''
     920620-1: ''
-    930110-7: ''
-    941120-4: 'investigate, Test added via https://github.com/coreruleset/coreruleset/pull/3822'
+    922130-1: ''
+    922130-2: ''
+    922130-7: ''
     942420-1: ''
     942421-1: ''
     942430-1: ''
