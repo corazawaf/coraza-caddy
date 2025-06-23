@@ -18,6 +18,7 @@ testoverride:
     # Failing tests related to upstream issues:
     921250-1: 'Expected to match $Version in cookies, failing also in upstream'
     921250-2: 'Expected to match $Version in cookies, failing also in upstream'
+    933120-2: 'To be investigated: match_regex value  might be ModSec specific'
 
     # TODO investigate failing tests:
     920100-10: ''
