@@ -18,7 +18,7 @@ import (
 )
 
 var addLicenseVersion = "v1.0.0" // https://github.com/google/addlicense
-var golangCILintVer = "v1.64.8"  // https://github.com/golangci/golangci-lint/releases
+var golangCILintVer = "v2.3.1"   // https://github.com/golangci/golangci-lint/releases
 var gosImportsVer = "v0.1.5"     // https://github.com/rinchsan/gosimports/releases/tag/v0.1.5
 
 var errRunGoModTidy = errors.New("go.mod/sum not formatted, commit changes")
@@ -47,7 +47,7 @@ func Format() error {
 
 // Lint verifies code quality.
 func Lint() error {
-	if err := sh.RunV("go", "run", fmt.Sprintf("github.com/golangci/golangci-lint/cmd/golangci-lint@%s", golangCILintVer), "run"); err != nil {
+	if err := sh.RunV("go", "run", fmt.Sprintf("github.com/golangci/golangci-lint/v2/cmd/golangci-lint@%s", golangCILintVer), "run"); err != nil {
 		return err
 	}
 
