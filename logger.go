@@ -45,12 +45,12 @@ func (l *logger) WithOutput(w io.Writer) debuglog.Logger {
 	}
 
 	return &logger{
-		Logger: l.Logger.WithOptions(
+		Logger: l.WithOptions(
 			zap.WrapCore(func(c zapcore.Core) zapcore.Core {
 				return zapcore.NewCore(
 					zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
 					zapcore.AddSync(w),
-					l.Logger.Level(),
+					l.Level(),
 				)
 			}),
 		),
