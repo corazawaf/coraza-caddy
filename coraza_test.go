@@ -5,10 +5,14 @@ package coraza
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -180,6 +184,167 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestResponseBody(t *testing.T) {
+	findFreePort := func(t *testing.T) int {
+		t.Helper()
+		ln, err := net.Listen("tcp", ":0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		addr := ln.Addr().String()
+		ln.Close()
+		_, portStr, err := net.SplitHostPort(addr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return port
+	}
+
+	const (
+		contentWithoutDataLeak    = "No data leak"
+		contentWithDataLeak       = "data leak: SQL Error!!"
+		limitActionReject         = "Reject"
+		limitActionProcessPartial = "ProcessPartial"
+	)
+	testCases := []struct {
+		name                      string
+		content                   string
+		responseBodyRelativeLimit int
+		responseBodyLimitAction   string
+		expectedStatusCode        int
+	}{
+		{
+			name:                      "OneByteLongerThanLimitAndRejects",
+			content:                   contentWithoutDataLeak,
+			responseBodyRelativeLimit: -1,
+			responseBodyLimitAction:   limitActionReject,
+			expectedStatusCode:        http.StatusRequestEntityTooLarge, // changed to http.StatusInternalServerError at https://github.com/corazawaf/coraza/pull/1379
+		},
+		{
+			name:                      "JustEqualToLimitAndAccepts",
+			content:                   contentWithoutDataLeak,
+			responseBodyRelativeLimit: 0,
+			responseBodyLimitAction:   limitActionReject,
+			// NOTE: According to https://coraza.io/docs/seclang/directives/#secresponsebodylimit
+			// expectedStatusCode should be http.StatusOK, but actually it is http.StatusRequestEntityTooLarge.
+			// Coraza should be fixed.
+			expectedStatusCode: http.StatusRequestEntityTooLarge,
+		},
+		{
+			name:                      "OneByteShorterThanLimitAndAccepts",
+			content:                   contentWithoutDataLeak,
+			responseBodyRelativeLimit: 1,
+			responseBodyLimitAction:   limitActionReject,
+			expectedStatusCode:        http.StatusOK,
+		},
+		{
+			name:                      "DataLeakAndRejects",
+			content:                   contentWithDataLeak,
+			responseBodyRelativeLimit: 1,
+			responseBodyLimitAction:   limitActionReject,
+			expectedStatusCode:        http.StatusForbidden,
+		},
+		{
+			name:                      "LimitReachedNoDataLeakPartialProcessing",
+			content:                   contentWithoutDataLeak,
+			responseBodyRelativeLimit: -3,
+			responseBodyLimitAction:   limitActionProcessPartial,
+			expectedStatusCode:        http.StatusOK,
+		},
+		{
+			name:                      "DataLeakFoundInPartialProcessing",
+			content:                   contentWithDataLeak,
+			responseBodyRelativeLimit: -2,
+			responseBodyLimitAction:   limitActionProcessPartial,
+			expectedStatusCode:        http.StatusForbidden,
+		},
+		{
+			name:                      "DataLeakAroundLimitPartialProcessing",
+			content:                   contentWithDataLeak,
+			responseBodyRelativeLimit: -3,
+			responseBodyLimitAction:   limitActionProcessPartial,
+			expectedStatusCode:        http.StatusOK,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			bodyLenThird := len(testCase.content) / 3
+			bodyChunks := map[string][]string{
+				"BodyInOneShot":     {testCase.content},
+				"BodyInThreeChunks": {testCase.content[0:bodyLenThird], testCase.content[bodyLenThird : 2*bodyLenThird], testCase.content[2*bodyLenThird:]},
+			}
+
+			for name, chunks := range bodyChunks {
+				t.Run(name, func(t *testing.T) {
+					originHandler := func(w http.ResponseWriter, r *http.Request) {
+						if len(chunks) == 1 {
+							w.Header().Set("Content-Length", strconv.Itoa(len(testCase.content)))
+						}
+						w.Header().Set("Content-Type", "text/plain")
+						for _, chunk := range chunks {
+							if n, err := fmt.Fprint(w, chunk); err != nil {
+								t.Logf("failed to write response: %s", err)
+							} else if got, want := n, len(chunk); got != want {
+								t.Errorf("written response byte count mismatch, got=%d, want=%d", got, want)
+							}
+							if f, ok := w.(http.Flusher); ok && len(chunks) > 1 {
+								f.Flush()
+							}
+						}
+					}
+					originServer := httptest.NewServer(http.HandlerFunc(originHandler))
+					t.Cleanup(originServer.Close)
+					originServerAddr := originServer.Listener.Addr().String()
+
+					caddyPort := findFreePort(t)
+					caddyAdminPort := caddytest.Default.AdminPort
+					tester := caddytest.NewTester(t)
+					config := fmt.Sprintf(`{
+						admin localhost:%d
+						auto_https off
+						order coraza_waf first
+						log {
+							level ERROR
+						}
+					}
+					(waf) {
+						coraza_waf {
+							directives `+"`"+`
+								SecRuleEngine On
+								SecResponseBodyAccess On
+								SecResponseBodyMimeType text/plain
+								SecResponseBodyLimit %d
+								SecResponseBodyLimitAction %s
+								SecRule RESPONSE_BODY "SQL Error" "id:100,phase:4,deny"
+							`+"`"+`
+						}
+					}
+					:%d {
+						import waf
+						reverse_proxy %s
+					}`, caddyAdminPort, len(testCase.content)+testCase.responseBodyRelativeLimit, testCase.responseBodyLimitAction, caddyPort, originServerAddr)
+					tester.InitServer(config, "caddyfile")
+
+					if testCase.expectedStatusCode == http.StatusOK {
+						tester.AssertGetResponse(fmt.Sprintf("http://127.0.0.1:%d", caddyPort), http.StatusOK, testCase.content)
+					} else {
+						req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d", caddyPort), nil)
+						if err != nil {
+							t.Fatal(err)
+						}
+						tester.AssertResponseCode(req, testCase.expectedStatusCode)
+					}
+				})
 			}
 		})
 	}
