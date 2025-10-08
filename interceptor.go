@@ -17,12 +17,13 @@ import (
 // rwInterceptor intercepts the ResponseWriter, so it can track response size
 // and returned status code.
 type rwInterceptor struct {
-	w                  http.ResponseWriter
-	tx                 types.Transaction
-	statusCode         int
-	proto              string
-	isWriteHeaderFlush bool
-	wroteHeader        bool
+	w                             http.ResponseWriter
+	tx                            types.Transaction
+	statusCode                    int
+	proto                         string
+	isWriteHeaderFlush            bool
+	wroteHeader                   bool
+	wroteBufferedBodyToDownstream bool
 }
 
 // WriteHeader records the status code to be sent right before the moment
@@ -93,7 +94,7 @@ func (i *rwInterceptor) Write(b []byte) (int, error) {
 		i.WriteHeader(http.StatusOK)
 	}
 
-	if i.tx.IsResponseBodyAccessible() && i.tx.IsResponseBodyProcessable() {
+	if i.tx.IsResponseBodyAccessible() && i.tx.IsResponseBodyProcessable() && !i.wroteBufferedBodyToDownstream {
 		// we only buffer the response body if we are going to access
 		// to it, otherwise we just send it to the response writer.
 		it, n, err := i.tx.WriteResponseBody(b)
@@ -109,7 +110,14 @@ func (i *rwInterceptor) Write(b []byte) (int, error) {
 			// See https://pkg.go.dev/io#Writer
 			return len(b), nil
 		}
-		return n, err
+		if err != nil || n == len(b) {
+			return n, err
+		}
+		if err := i.writeBufferedResponseBodyToDownstream(); err != nil {
+			return n, err
+		}
+		n2, err := i.w.Write(b[n:])
+		return n + n2, err
 	}
 
 	// flush the status code before writing
@@ -132,6 +140,40 @@ func (i *rwInterceptor) Flush() {
 	if !i.wroteHeader {
 		i.WriteHeader(http.StatusOK)
 	}
+}
+
+func (i *rwInterceptor) writeBufferedResponseBodyToDownstream() error {
+	if i.wroteBufferedBodyToDownstream {
+		return nil
+	}
+
+	// we release the buffer
+	reader, err := i.tx.ResponseBodyReader()
+	if err != nil {
+		i.overrideWriteHeader(http.StatusInternalServerError)
+		i.flushWriteHeader()
+
+		return caddyhttp.HandlerError{
+			ID:         i.tx.ID(),
+			StatusCode: http.StatusInternalServerError,
+			Err:        fmt.Errorf("failed to release the response body reader: %v", err),
+		}
+	}
+
+	// this is the last opportunity we have to report the resolved status code
+	// as next step is write into the response writer (triggering a 200 in the
+	// response status code.)
+	i.flushWriteHeader()
+	if _, err := io.Copy(i.w, reader); err != nil {
+		return caddyhttp.HandlerError{
+			ID:         i.tx.ID(),
+			StatusCode: http.StatusInternalServerError,
+			Err:        fmt.Errorf("failed to copy the response body: %v", err),
+		}
+	}
+
+	i.wroteBufferedBodyToDownstream = true
+	return nil
 }
 
 type responseWriter interface {
@@ -162,7 +204,7 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 			return nil
 		}
 
-		if tx.IsResponseBodyAccessible() && tx.IsResponseBodyProcessable() {
+		if tx.IsResponseBodyAccessible() && tx.IsResponseBodyProcessable() && !i.wroteBufferedBodyToDownstream {
 			if it, err := tx.ProcessResponseBody(); err != nil {
 				i.overrideWriteHeader(http.StatusInternalServerError)
 				i.flushWriteHeader()
@@ -186,30 +228,7 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 				}
 			}
 
-			// we release the buffer
-			reader, err := tx.ResponseBodyReader()
-			if err != nil {
-				i.overrideWriteHeader(http.StatusInternalServerError)
-				i.flushWriteHeader()
-
-				return caddyhttp.HandlerError{
-					ID:         tx.ID(),
-					StatusCode: http.StatusInternalServerError,
-					Err:        fmt.Errorf("failed to release the response body reader: %v", err),
-				}
-			}
-
-			// this is the last opportunity we have to report the resolved status code
-			// as next step is write into the response writer (triggering a 200 in the
-			// response status code.)
-			i.flushWriteHeader()
-			if _, err := io.Copy(w, reader); err != nil {
-				return caddyhttp.HandlerError{
-					ID:         tx.ID(),
-					StatusCode: http.StatusInternalServerError,
-					Err:        fmt.Errorf("failed to copy the response body: %v", err),
-				}
-			}
+			return i.writeBufferedResponseBodyToDownstream()
 		} else {
 			i.flushWriteHeader()
 		}
