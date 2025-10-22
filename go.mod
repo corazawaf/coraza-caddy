@@ -3,7 +3,7 @@ module github.com/corazawaf/coraza-caddy/v2
 go 1.23.0
 
 require (
-	github.com/caddyserver/caddy/v2 v2.9.1
+	github.com/caddyserver/caddy/v2 v2.10.2
 	github.com/corazawaf/coraza-coreruleset/v4 v4.17.1
 	github.com/corazawaf/coraza/v3 v3.3.3
 	github.com/jcchavezs/mergefs v0.1.0
