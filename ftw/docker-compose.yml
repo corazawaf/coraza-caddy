@@ -61,6 +61,7 @@ services:
     environment:
       - FTW_CLOUDMODE
       - FTW_INCLUDE
+      - FTW_DEBUG
     volumes:
       - logs:/home/caddy/logs:ro
       - ../build:/build
