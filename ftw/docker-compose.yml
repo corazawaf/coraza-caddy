@@ -35,7 +35,7 @@ services:
     entrypoint: bash
     command:
       - -c
-      - tail -c +0 -f /home/caddy/logs/caddy.log | grep --line-buffered "http.handlers.waf" > /home/caddy/logs/ftw.log
+      - tail -c +0 -f /home/caddy/logs/caddy.log | grep --line-buffered -P '\t(\x1B\[[\d;]+m)?(ERROR|WARN|INFO)(\x1B\[0m)?\thttp.handlers.waf' > /home/caddy/logs/ftw.log
     volumes:
       - logs:/home/caddy/logs:rw
 
