@@ -22,13 +22,13 @@ while [[ "$status_code" -eq "000" ]]; do
   let "max_retries--"
   if [[ "$max_retries" -eq 0 ]]; then
     echo "[Fail] Timeout waiting for response from $health_url, make sure the server is running."
-    echo "Caddy Logs:" && cat /home/caddy/logs/caddy.log
+    echo "Caddy Logs:" && cat /home/caddy/logs/ftw.log
     exit 1
   fi
 done
 if [[ "${status_code}" -ne "200" ]]; then
   echo "[Fail] Unexpected response with code ${status_code} from ${health_url}, expected 200."
-  echo "Caddy Logs:" && cat /home/caddy/logs/caddy.log
+  echo "Caddy Logs:" && cat /home/caddy/logs/ftw.log
   exit 1
 fi
 echo -e "\n[Ok] Got status code $status_code, expected 200. Ready to start."

@@ -1,5 +1,5 @@
 ---
-logfile: '/home/caddy/logs/caddy.log'
+logfile: '/home/caddy/logs/ftw.log'
 maxmarkerretries: 10
 testoverride:
   input:
