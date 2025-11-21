@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -97,7 +98,17 @@ func E2e() error {
 
 // Ftw runs CRS regressions tests. Requires docker.
 func Ftw() error {
-	if err := sh.RunV("docker", "compose", "--file", "ftw/docker-compose.yml", "build", "--pull"); err != nil {
+	crsModVer := os.Getenv("CRS_VERSION")
+	if crsModVer == "" {
+		var err error
+		crsModVer, err = getModuleVersion("github.com/corazawaf/coraza-coreruleset/v4")
+		if err != nil {
+			return fmt.Errorf("cannot get coraza-coreruleset module version: %s", err)
+		}
+	}
+	buildArg := fmt.Sprintf("CRS_VERSION=%s", crsModVer)
+
+	if err := sh.RunV("docker", "compose", "--file", "ftw/docker-compose.yml", "build", "--pull", "--build-arg", buildArg); err != nil {
 		return err
 	}
 	defer func() {
@@ -110,6 +121,18 @@ func Ftw() error {
 
 	task := "ftw"
 	return sh.RunWithV(env, "docker", "compose", "--file", "ftw/docker-compose.yml", "run", "--rm", task)
+}
+
+func getModuleVersion(modulePath string) (string, error) {
+	modLine, err := sh.Output("go", "list", "-m", modulePath)
+	if err != nil {
+		return "", fmt.Errorf("cannot get coraza-coreruleset module version: %s", err)
+	}
+	_, modVer, found := strings.Cut(modLine, " ")
+	if !found {
+		return "", errors.New("cannot get coraza-coreruleset module version: unexpected module line format")
+	}
+	return modVer, nil
 }
 
 // Coverage runs tests with coverage and race detector enabled.
