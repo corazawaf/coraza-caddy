@@ -108,6 +108,8 @@ func Ftw() error {
 		}
 	}
 
+	fmt.Printf("Running FTW tests with CRS version: %s\n", CRSVersion)
+
 	if err := sh.Run("docker",
 		"compose",
 		"--file",
