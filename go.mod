@@ -8,7 +8,7 @@ require (
 	github.com/corazawaf/coraza/v3 v3.3.3
 	github.com/jcchavezs/mergefs v0.1.0
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.27.0
 )
 
