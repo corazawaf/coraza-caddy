@@ -24,6 +24,8 @@ var gosImportsVer = "v0.1.5"     // https://github.com/rinchsan/gosimports/relea
 var errRunGoModTidy = errors.New("go.mod/sum not formatted, commit changes")
 var errNoGitDir = errors.New("no .git directory found")
 
+const ftwDockerCompose = "ftw/docker-compose.yml"
+
 // Format formats code in this repository.
 func Format() error {
 	if err := sh.RunV("go", "mod", "tidy"); err != nil {
@@ -97,19 +99,46 @@ func E2e() error {
 
 // Ftw runs CRS regressions tests. Requires docker.
 func Ftw() error {
-	if err := sh.RunV("docker", "compose", "--file", "ftw/docker-compose.yml", "build", "--pull"); err != nil {
+	CRSVersion := os.Getenv("CRS_VERSION")
+	if CRSVersion == "" {
+		var err error
+		CRSVersion, err = getModuleVersion("github.com/corazawaf/coraza-coreruleset/v4")
+		if err != nil {
+			return fmt.Errorf("cannot get coraza-coreruleset module version: %s", err)
+		}
+	}
+
+	fmt.Printf("Running FTW tests with CRS version: %s\n", CRSVersion)
+
+	if err := sh.Run("docker",
+		"compose",
+		"--file",
+		ftwDockerCompose,
+		"build", "--pull", "--no-cache",
+		"--build-arg", fmt.Sprintf("CRS_VERSION=%s", CRSVersion),
+	); err != nil {
 		return err
 	}
 	defer func() {
-		_ = sh.RunV("docker", "compose", "--file", "ftw/docker-compose.yml", "down", "-v")
+		_ = sh.RunV("docker", "compose", "--file", ftwDockerCompose, "down", "-v")
 	}()
+
 	env := map[string]string{
 		"FTW_CLOUDMODE": os.Getenv("FTW_CLOUDMODE"),
 		"FTW_INCLUDE":   os.Getenv("FTW_INCLUDE"),
 	}
 
 	task := "ftw"
-	return sh.RunWithV(env, "docker", "compose", "--file", "ftw/docker-compose.yml", "run", "--rm", task)
+	return sh.RunWithV(env, "docker", "compose", "--file", ftwDockerCompose, "run", "--rm", task)
+}
+
+// getModuleVersion gets the version of a go module used in the current go.mod file.
+func getModuleVersion(modulePath string) (string, error) {
+	modVer, err := sh.Output("go", "list", "-m", "-f", "{{.Version}}", modulePath)
+	if err != nil {
+		return "", fmt.Errorf("cannot get module version for %s: %w", modulePath, err)
+	}
+	return modVer, nil
 }
 
 // Coverage runs tests with coverage and race detector enabled.
