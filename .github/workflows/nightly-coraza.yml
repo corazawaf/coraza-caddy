@@ -39,7 +39,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Fetch last coraza version
-        run: go get -u github.com/corazawaf/coraza/v3@${{ steps.coraza-latest-commit.outputs.value }} && go mod tidy
+        run: go get github.com/corazawaf/coraza/v3@${{ steps.coraza-latest-commit.outputs.value }} && go mod tidy
 
       - name: Build caddy
         run: go run mage.go buildCaddyLinux
