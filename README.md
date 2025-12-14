@@ -9,8 +9,6 @@
 OWASP Coraza WAF is 100% compatible with OWASP Coreruleset and Modsecurity syntax.
 ## CRS Documentation
 
-Coraza WAF is compatible with the OWASP Core Rule Set (CRS) and ModSecurity syntax.
-
 If you’re looking for installation guidance, tuning, false-positive handling, or
 deployment best practices for CRS, refer to the official OWASP CRS documentation.
 
