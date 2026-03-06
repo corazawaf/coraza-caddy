@@ -266,9 +266,14 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 }
 
 // obtainStatusCodeFromInterruptionOrDefault returns the desired status code derived from the interruption
-// on a "deny" action or a default value.
+// on a "deny" or "drop" action, or a default value.
+//
+// The "drop" action in ModSecurity/Coraza is intended to reset the TCP connection,
+// but coraza-caddy operates as HTTP middleware and cannot perform TCP-level operations.
+// We treat "drop" the same as "deny" — using the rule's status code (or 403 if unset)
+// so that Caddy's handle_errors can serve a proper error page.
 func obtainStatusCodeFromInterruptionOrDefault(it *types.Interruption, defaultStatusCode int) int {
-	if it.Action == "deny" {
+	if it.Action == "deny" || it.Action == "drop" {
 		statusCode := it.Status
 		if statusCode == 0 {
 			statusCode = 403
