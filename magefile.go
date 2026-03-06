@@ -17,9 +17,9 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-var addLicenseVersion = "v1.0.0" // https://github.com/google/addlicense
-var golangCILintVer = "v2.3.1"   // https://github.com/golangci/golangci-lint/releases
-var gosImportsVer = "v0.1.5"     // https://github.com/rinchsan/gosimports/releases/tag/v0.1.5
+var addLicenseVersion = "v1.2.0" // https://github.com/google/addlicense
+var golangCILintVer = "v2.10.1"   // https://github.com/golangci/golangci-lint/releases
+var gosImportsVer = "v0.3.8"     // https://github.com/rinchsan/gosimports/releases/tag/v0.1.5
 
 var errRunGoModTidy = errors.New("go.mod/sum not formatted, commit changes")
 var errNoGitDir = errors.New("no .git directory found")
@@ -74,6 +74,7 @@ func Test() error {
 
 // E2e runs e2e tests with a built plugin against the e2e deployment. Requires docker.
 func E2e() error {
+	mg.Deps(BuildCaddyLinux)
 	var err error
 	if err = sh.RunV("docker", "compose", "-f", "e2e/docker-compose.yml", "up", "-d", "caddy"); err != nil {
 		return err
