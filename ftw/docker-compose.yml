@@ -6,7 +6,7 @@ services:
       - 8081:8081
 
   chown:
-    image: alpine:3.22
+    image: alpine:3.23
     command:
       - /bin/sh
       - -c
