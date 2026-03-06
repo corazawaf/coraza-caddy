@@ -113,6 +113,9 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
 	repl.Set("http.transaction_id", id)
 
+	server := r.Context().Value(caddyhttp.ServerCtxKey).(*caddyhttp.Server)
+	caddyhttp.PrepareRequest(r, repl, w, server)
+
 	// ProcessRequest is just a wrapper around ProcessConnection, ProcessURI,
 	// ProcessRequestHeaders and ProcessRequestBody.
 	// It fails if any of these functions returns an error and it stops on interruption.
