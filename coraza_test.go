@@ -349,3 +349,22 @@ func TestResponseBody(t *testing.T) {
 		})
 	}
 }
+
+func TestTxIDReqHeader(t *testing.T) {
+	tester := newTester("test2.init.config", t)
+
+	req, err := http.NewRequest("GET", baseURL+"/test", nil)
+	if err != nil {
+		t.Fatalf("unable to create request %s", err)
+	}
+
+	// In real use case, this header should be set by a HTTP proxy before coraza, not by a client.
+	txID := "transaction1"
+	req.Header.Add("my-tx-id", txID)
+
+	res, _ := tester.AssertResponse(req, 200, "test123")
+
+	if got, want := res.Header.Get("x-request-id"), txID; got != want {
+		t.Errorf("transaction ID mismatch, got=%v, want=%v", got, want)
+	}
+}
