@@ -92,6 +92,16 @@ func (m *corazaModule) Validate() error {
 	return nil
 }
 
+// Cleanup implements caddy.CleanerUpper.
+func (m *corazaModule) Cleanup() error {
+	// Cleaning up the WAF instance isn't strictly necessary,
+	// but it makes it available for garbage collection earlier.
+	// This prevents high memory usage on consecutive reloads.
+	m.waf = nil
+	m.logger = nil
+	return nil
+}
+
 var errInterruptionTriggered = errors.New("interruption triggered")
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
@@ -218,6 +228,7 @@ func newErrorCb(logger *zap.Logger) func(types.MatchedRule) {
 var (
 	_ caddy.Provisioner           = (*corazaModule)(nil)
 	_ caddy.Validator             = (*corazaModule)(nil)
+	_ caddy.CleanerUpper          = (*corazaModule)(nil)
 	_ caddyhttp.MiddlewareHandler = (*corazaModule)(nil)
 	_ caddyfile.Unmarshaler       = (*corazaModule)(nil)
 )
