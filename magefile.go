@@ -91,7 +91,7 @@ func E2e() error {
 		httpbinHost = "localhost:8081"
 	}
 
-	if err = sh.RunV("go", "run", "github.com/corazawaf/coraza/v3/http/e2e/cmd/httpe2e@main", "--proxy-hostport", "http://"+caddyHost, "--httpbin-hostport", "http://"+httpbinHost); err != nil {
+	if err = sh.RunV("go", "run", "github.com/corazawaf/coraza/v3/http/e2e/cmd/httpe2e@add-testcase-for-streamed-responses", "--proxy-hostport", "http://"+caddyHost, "--httpbin-hostport", "http://"+httpbinHost); err != nil {
 		sh.RunV("docker", "compose", "-f", "e2e/docker-compose.yml", "logs", "caddy")
 	}
 	return err
