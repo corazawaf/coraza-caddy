@@ -7,6 +7,13 @@
 [OWASP Coraza](https://github.com/corazawaf/coraza) Caddy Module provides Web Application Firewall capabilities for Caddy.
 
 OWASP Coraza WAF is 100% compatible with OWASP Coreruleset and Modsecurity syntax.
+## CRS Documentation
+
+If you’re looking for installation guidance, tuning, false-positive handling, or
+deployment best practices for CRS, refer to the official OWASP CRS documentation.
+
+This repository focuses on Coraza integration and runtime behavior rather than
+maintaining CRS rule documentation.
 
 ## Getting started
 
