@@ -74,6 +74,7 @@ func Test() error {
 
 // E2e runs e2e tests with a built plugin against the e2e deployment. Requires docker.
 func E2e() error {
+	mg.Deps(BuildCaddyLinux)
 	var err error
 	if err = sh.RunV("docker", "compose", "-f", "e2e/docker-compose.yml", "up", "-d", "caddy"); err != nil {
 		return err
