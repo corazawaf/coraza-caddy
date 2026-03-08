@@ -18,7 +18,9 @@ import (
 
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddytest"
+	coraza "github.com/corazawaf/coraza/v3"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 const baseURL = "http://127.0.0.1:8080"
@@ -187,6 +189,26 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCleanup(t *testing.T) {
+	// Manually set waf and logger to non-nil values.
+	// We don't need a full Provision cycle to test Cleanup.
+	waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+	require.NoError(t, err)
+
+	m := &corazaModule{
+		waf:    waf,
+		logger: zap.NewNop(),
+	}
+
+	require.NotNil(t, m.waf, "waf should be set before Cleanup")
+	require.NotNil(t, m.logger, "logger should be set before Cleanup")
+
+	// After Cleanup the fields must be nil so the GC can collect them.
+	require.NoError(t, m.Cleanup())
+	require.Nil(t, m.waf, "waf should be nil after Cleanup")
+	require.Nil(t, m.logger, "logger should be nil after Cleanup")
 }
 
 func TestResponseBody(t *testing.T) {
