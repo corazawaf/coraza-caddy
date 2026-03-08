@@ -38,6 +38,28 @@ SecRule ARGS "456" "id:1,phase:2,deny,status:403"
 	}
 }
 
+func TestProcessRequestWithTransferEncoding(t *testing.T) {
+	cfg := coraza.NewWAFConfig().WithDirectives(`
+SecRuleEngine On
+SecRequestBodyAccess On
+SecRule REQUEST_HEADERS:Transfer-Encoding "chunked" "id:100,phase:1,deny,status:403"
+	`)
+	waf, err := coraza.NewWAF(cfg)
+	require.NoError(t, err)
+
+	tx := waf.NewTransaction()
+	defer tx.Close()
+
+	r, err := http.NewRequest("POST", "/test", strings.NewReader("test body"))
+	require.NoError(t, err)
+	r.TransferEncoding = []string{"chunked"}
+
+	it, err := processRequest(tx, r)
+	require.NoError(t, err)
+	require.NotNil(t, it, "expected interruption from Transfer-Encoding rule")
+	require.Equal(t, 403, it.Status)
+}
+
 func TestParseServerName(t *testing.T) {
 	require.Equal(t, "www.example.com", parseServerName("www.example.com"))
 	require.Equal(t, "1.2.3.4", parseServerName("1.2.3.4:80"))
