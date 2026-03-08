@@ -50,5 +50,5 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: success() || failure()
         with:
-          name: ftw-caddy-logs
+          name: ftw-caddy-logs-${{ matrix.go-version }}
           path: build/ftw-caddy.log
