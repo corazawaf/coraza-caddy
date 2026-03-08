@@ -12,9 +12,9 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: v1.23.x
+          go-version: 1.25.x
           cache: true
 
       - run: go run mage.go lint

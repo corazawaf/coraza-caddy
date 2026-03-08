@@ -16,13 +16,13 @@ jobs:
     name: "Nightly Caddy (caddy version: ${{ github.event.inputs.caddyversion || 'master' }})"
     strategy:
       matrix:
-        go-version: [1.23.x]
+        go-version: [1.25.x, 1.26.x]
         os: [ubuntu-latest]
         xcaddy-version: [v0.3.5]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ matrix.go-version }}
 
