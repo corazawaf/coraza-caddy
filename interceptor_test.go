@@ -380,6 +380,49 @@ func finishStream(t *testing.T, s *streamState) {
 	}
 }
 
+func TestWriteWhenInterrupted(t *testing.T) {
+	waf := newWAF(t, `
+		SecRuleEngine On
+		SecRule REQUEST_URI "/blocked" "id:1,phase:1,deny,status:403"
+	`)
+	tx := waf.NewTransaction()
+	defer tx.Close()
+
+	// Trigger phase-1 interruption via request headers
+	req, _ := http.NewRequest("GET", "/blocked", nil)
+	req.Host = "example.com"
+	it, err := processRequest(tx, req)
+	require.NoError(t, err)
+	require.NotNil(t, it, "expected phase-1 interruption")
+
+	rec := httptest.NewRecorder()
+	i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+	data := []byte("this should not be written")
+	n, writeErr := i.Write(data)
+	require.NoError(t, writeErr)
+	require.Equal(t, len(data), n)
+	require.Empty(t, rec.Body.String(), "no data should reach the underlying writer")
+}
+
+func TestFlushDelegatesToUnderlyingFlusher(t *testing.T) {
+	waf := newWAF(t, `
+		SecRuleEngine On
+		SecResponseBodyAccess Off
+	`)
+	tx := waf.NewTransaction()
+	defer tx.Close()
+
+	rec := httptest.NewRecorder()
+	i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+	i.WriteHeader(http.StatusOK)
+	i.Flush()
+
+	require.True(t, i.isWriteHeaderFlush, "status code should have been flushed")
+	require.True(t, rec.Flushed, "underlying http.Flusher should have been called")
+}
+
 // TestConcurrentStreamingResponseFlush uses real HTTP connections to verify
 // that 100 concurrent streaming responses flushed through the interceptor
 // deliver chunks to clients without blocking each other.
