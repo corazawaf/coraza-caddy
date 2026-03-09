@@ -4,9 +4,12 @@
 package coraza
 
 import (
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/caddyserver/caddy/v2"
@@ -21,9 +24,27 @@ import (
 	"go.uber.org/zap"
 )
 
+// wafPool is a process-global pool that allows WAF instances to be shared
+// across Caddy config reloads. When two consecutive configs use the same
+// WAF configuration, the pool returns the existing WAF instead of building
+// a new one, saving both memory and CPU.
+var wafPool = caddy.NewUsagePool()
+
 func init() {
 	caddy.RegisterModule(corazaModule{})
 	httpcaddyfile.RegisterHandlerDirective("coraza_waf", parseCaddyfile)
+}
+
+// pooledWAF wraps a coraza.WAF so it can be stored in a caddy.UsagePool.
+// It implements caddy.Destructor so the pool can clean it up when all
+// references are released.
+type pooledWAF struct {
+	waf coraza.WAF
+}
+
+func (p *pooledWAF) Destruct() error {
+	p.waf = nil
+	return nil
 }
 
 // corazaModule is a Web Application Firewall implementation for Caddy.
@@ -33,8 +54,9 @@ type corazaModule struct {
 	Directives   string   `json:"directives"`
 	LoadOWASPCRS bool     `json:"load_owasp_crs"`
 
-	logger *zap.Logger
-	waf    coraza.WAF
+	logger  *zap.Logger
+	waf     coraza.WAF
+	poolKey string
 }
 
 // CaddyModule returns the Caddy module information.
@@ -48,7 +70,28 @@ func (corazaModule) CaddyModule() caddy.ModuleInfo {
 // Provision implements caddy.Provisioner.
 func (m *corazaModule) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger(m)
+	m.poolKey = m.computePoolKey()
 
+	val, loaded, err := wafPool.LoadOrNew(m.poolKey, func() (caddy.Destructor, error) {
+		waf, err := m.buildWAF()
+		if err != nil {
+			return nil, err
+		}
+		return &pooledWAF{waf: waf}, nil
+	})
+	if err != nil {
+		return err
+	}
+
+	m.waf = val.(*pooledWAF).waf
+	if loaded {
+		m.logger.Info("reusing existing WAF instance from pool")
+	}
+	return nil
+}
+
+// buildWAF creates a new coraza.WAF from the module's configuration.
+func (m *corazaModule) buildWAF() (coraza.WAF, error) {
 	config := coraza.NewWAFConfig().
 		WithErrorCallback(newErrorCb(m.logger)).
 		WithDebugLogger(newLogger(m.logger))
@@ -69,7 +112,7 @@ func (m *corazaModule) Provision(ctx caddy.Context) error {
 				// we get files as expandables globs (with wildcard patterns)
 				fs, err := filepath.Glob(file)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				m.logger.Debug("Glob expanded", zap.String("pattern", file), zap.Strings("files", fs))
 				for _, f := range fs {
@@ -82,9 +125,29 @@ func (m *corazaModule) Provision(ctx caddy.Context) error {
 		}
 	}
 
-	var err error
-	m.waf, err = coraza.NewWAF(config)
-	return err
+	return coraza.NewWAF(config)
+}
+
+// computePoolKey returns a deterministic key derived from the configuration
+// fields that affect WAF construction. Two modules with identical configs
+// will produce the same key, enabling WAF reuse across reloads.
+func (m *corazaModule) computePoolKey() string {
+	h := sha256.New()
+	h.Write([]byte(m.Directives))
+	h.Write([]byte{0}) // separator
+
+	sorted := make([]string, len(m.Include))
+	copy(sorted, m.Include)
+	sort.Strings(sorted)
+	for _, inc := range sorted {
+		h.Write([]byte(inc))
+		h.Write([]byte{0})
+	}
+
+	if m.LoadOWASPCRS {
+		h.Write([]byte("crs"))
+	}
+	return fmt.Sprintf("coraza-waf-%x", h.Sum(nil))
 }
 
 // Validate implements caddy.Validator.
@@ -94,12 +157,10 @@ func (m *corazaModule) Validate() error {
 
 // Cleanup implements caddy.CleanerUpper.
 func (m *corazaModule) Cleanup() error {
-	// Cleaning up the WAF instance isn't strictly necessary,
-	// but it makes it available for garbage collection earlier.
-	// This prevents high memory usage on consecutive reloads.
+	_, err := wafPool.Delete(m.poolKey)
 	m.waf = nil
 	m.logger = nil
-	return nil
+	return err
 }
 
 var errInterruptionTriggered = errors.New("interruption triggered")

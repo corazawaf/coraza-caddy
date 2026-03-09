@@ -197,9 +197,14 @@ func TestCleanup(t *testing.T) {
 	waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithDirectives("SecRuleEngine On"))
 	require.NoError(t, err)
 
+	poolKey := "test-cleanup-key"
+	// Store the WAF in the pool so Cleanup can release it.
+	wafPool.LoadOrStore(poolKey, &pooledWAF{waf: waf})
+
 	m := &corazaModule{
-		waf:    waf,
-		logger: zap.NewNop(),
+		waf:     waf,
+		logger:  zap.NewNop(),
+		poolKey: poolKey,
 	}
 
 	require.NotNil(t, m.waf, "waf should be set before Cleanup")
@@ -209,6 +214,27 @@ func TestCleanup(t *testing.T) {
 	require.NoError(t, m.Cleanup())
 	require.Nil(t, m.waf, "waf should be nil after Cleanup")
 	require.Nil(t, m.logger, "logger should be nil after Cleanup")
+}
+
+func TestUsagePoolReuse(t *testing.T) {
+	// Simulate two modules with the same config — they should share a WAF.
+	m1 := &corazaModule{
+		Directives: "SecRuleEngine On",
+	}
+	m2 := &corazaModule{
+		Directives: "SecRuleEngine On",
+	}
+
+	require.Equal(t, m1.computePoolKey(), m2.computePoolKey(),
+		"identical configs must produce the same pool key")
+
+	// Different config should produce a different key.
+	m3 := &corazaModule{
+		Directives:   "SecRuleEngine On",
+		LoadOWASPCRS: true,
+	}
+	require.NotEqual(t, m1.computePoolKey(), m3.computePoolKey(),
+		"different configs must produce different pool keys")
 }
 
 func TestResponseBody(t *testing.T) {
