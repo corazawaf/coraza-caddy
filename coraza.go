@@ -158,8 +158,6 @@ func (m *corazaModule) Validate() error {
 // Cleanup implements caddy.CleanerUpper.
 func (m *corazaModule) Cleanup() error {
 	_, err := wafPool.Delete(m.poolKey)
-	m.waf = nil
-	m.logger = nil
 	return err
 }
 
