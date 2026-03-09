@@ -140,6 +140,19 @@ func (i *rwInterceptor) Flush() {
 	if !i.wroteHeader {
 		i.WriteHeader(http.StatusOK)
 	}
+
+	// If we are still buffering the response body for inspection, we must not
+	// flush the status code to the downstream writer yet. Doing so would
+	// prevent us from changing the status code if a later rule triggers an
+	// interruption (e.g. phase 4 deny).
+	if i.tx.IsResponseBodyAccessible() && i.tx.IsResponseBodyProcessable() && !i.wroteBufferedBodyToDownstream {
+		return
+	}
+
+	i.flushWriteHeader()
+	if flusher, ok := i.w.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 func (i *rwInterceptor) writeBufferedResponseBodyToDownstream() error {

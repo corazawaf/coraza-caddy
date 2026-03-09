@@ -238,6 +238,23 @@ func TestProvision(t *testing.T) {
 	})
 }
 
+func TestCleanup(t *testing.T) {
+	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+	require.NoError(t, err)
+
+	m := &corazaModule{
+		waf:    waf,
+		logger: zap.NewNop(),
+	}
+
+	require.NotNil(t, m.waf, "waf should be set before Cleanup")
+	require.NotNil(t, m.logger, "logger should be set before Cleanup")
+
+	require.NoError(t, m.Cleanup())
+	require.Nil(t, m.waf, "waf should be nil after Cleanup")
+	require.Nil(t, m.logger, "logger should be nil after Cleanup")
+}
+
 func TestNewErrorCb(t *testing.T) {
 	tests := []struct {
 		name          string
