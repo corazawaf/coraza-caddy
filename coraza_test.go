@@ -5,6 +5,7 @@ package coraza
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -12,15 +13,19 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddytest"
-	coraza "github.com/corazawaf/coraza/v3"
+	corazaWAF "github.com/corazawaf/coraza/v3"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 const baseURL = "http://127.0.0.1:8080"
@@ -191,10 +196,50 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 	}
 }
 
+func TestProvision(t *testing.T) {
+	newCtx := func(t *testing.T) caddy.Context {
+		t.Helper()
+		ctx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+		t.Cleanup(cancel)
+		return ctx
+	}
+
+	t.Run("basic directives", func(t *testing.T) {
+		m := &corazaModule{Directives: "SecRuleEngine On"}
+		require.NoError(t, m.Provision(newCtx(t)))
+		require.NotNil(t, m.waf)
+	})
+
+	t.Run("include file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		ruleFile := filepath.Join(tmpDir, "rules.conf")
+		require.NoError(t, os.WriteFile(ruleFile, []byte("SecRuleEngine On"), 0644))
+
+		m := &corazaModule{Include: []string{ruleFile}}
+		require.NoError(t, m.Provision(newCtx(t)))
+		require.NotNil(t, m.waf)
+	})
+
+	t.Run("include glob", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		for i := range 2 {
+			ruleFile := filepath.Join(tmpDir, fmt.Sprintf("rule%d.conf", i))
+			require.NoError(t, os.WriteFile(ruleFile, []byte("SecRuleEngine On"), 0644))
+		}
+
+		m := &corazaModule{Include: []string{filepath.Join(tmpDir, "*.conf")}}
+		require.NoError(t, m.Provision(newCtx(t)))
+		require.NotNil(t, m.waf)
+	})
+
+	t.Run("invalid directives", func(t *testing.T) {
+		m := &corazaModule{Directives: "SecInvalidDirective foo"}
+		require.Error(t, m.Provision(newCtx(t)))
+	})
+}
+
 func TestCleanup(t *testing.T) {
-	// Manually set waf and logger to non-nil values.
-	// We don't need a full Provision cycle to test Cleanup.
-	waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
 	require.NoError(t, err)
 
 	poolKey := "test-cleanup-key"
@@ -237,6 +282,49 @@ func TestUsagePoolReuse(t *testing.T) {
 	}
 	require.NotEqual(t, m1.computePoolKey(), m3.computePoolKey(),
 		"different configs must produce different pool keys")
+}
+
+func TestNewErrorCb(t *testing.T) {
+	tests := []struct {
+		name          string
+		severity      int // ModSecurity severity: 0=emergency ... 7=debug
+		expectedLevel zapcore.Level
+	}{
+		{"emergency", 0, zapcore.ErrorLevel},
+		{"alert", 1, zapcore.ErrorLevel},
+		{"critical", 2, zapcore.ErrorLevel},
+		{"error", 3, zapcore.ErrorLevel},
+		{"warning", 4, zapcore.WarnLevel},
+		{"notice", 5, zapcore.InfoLevel},
+		{"info", 6, zapcore.InfoLevel},
+		{"debug", 7, zapcore.DebugLevel},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core, logs := observer.New(zapcore.DebugLevel)
+
+			waf, err := corazaWAF.NewWAF(
+				corazaWAF.NewWAFConfig().
+					WithErrorCallback(newErrorCb(zap.New(core))).
+					WithDirectives(fmt.Sprintf(
+						`SecRuleEngine On
+						SecRule REQUEST_URI "/trigger" "id:1,phase:1,pass,log,severity:%d"`,
+						tt.severity,
+					)),
+			)
+			require.NoError(t, err)
+
+			tx := waf.NewTransaction()
+			tx.ProcessURI("/trigger", "GET", "HTTP/1.1")
+			tx.ProcessRequestHeaders()
+			tx.ProcessLogging()
+			tx.Close()
+
+			require.GreaterOrEqual(t, logs.Len(), 1)
+			require.Equal(t, tt.expectedLevel, logs.All()[0].Level)
+		})
+	}
 }
 
 func TestResponseBody(t *testing.T) {

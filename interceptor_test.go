@@ -7,15 +7,240 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
+	"github.com/stretchr/testify/require"
 )
+
+func newTestTransaction(t *testing.T) types.Transaction {
+	t.Helper()
+	waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+	require.NoError(t, err)
+	return waf.NewTransaction()
+}
+
+func TestReadFrom(t *testing.T) {
+	tx := newTestTransaction(t)
+	defer tx.Close()
+
+	rec := httptest.NewRecorder()
+	i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+	data := "hello world from ReadFrom"
+	n, err := i.ReadFrom(strings.NewReader(data))
+	require.NoError(t, err)
+	require.Equal(t, int64(len(data)), n)
+	require.Equal(t, data, rec.Body.String())
+}
+
+func TestFlush(t *testing.T) {
+	t.Run("triggers WriteHeader when not yet written", func(t *testing.T) {
+		tx := newTestTransaction(t)
+		defer tx.Close()
+
+		rec := httptest.NewRecorder()
+		i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+		require.False(t, i.wroteHeader)
+		i.Flush()
+		require.True(t, i.wroteHeader)
+	})
+
+	t.Run("no-op after WriteHeader", func(t *testing.T) {
+		tx := newTestTransaction(t)
+		defer tx.Close()
+
+		rec := httptest.NewRecorder()
+		i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+		i.WriteHeader(http.StatusCreated)
+		i.Flush()
+		require.Equal(t, http.StatusCreated, i.statusCode)
+	})
+}
+
+func TestObtainStatusCode(t *testing.T) {
+	tests := []struct {
+		name       string
+		action     string
+		status     int
+		defaultSC  int
+		wantStatus int
+	}{
+		{"deny with explicit status", "deny", 503, 200, 503},
+		{"deny with zero status defaults to 403", "deny", 0, 200, 403},
+		{"non-deny returns default", "redirect", 302, 200, 200},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			it := &types.Interruption{Action: tt.action, Status: tt.status}
+			require.Equal(t, tt.wantStatus, obtainStatusCodeFromInterruptionOrDefault(it, tt.defaultSC))
+		})
+	}
+}
+
+func TestWriteHeaderSuperfluous(t *testing.T) {
+	tx := newTestTransaction(t)
+	defer tx.Close()
+
+	rec := httptest.NewRecorder()
+	i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+	i.WriteHeader(http.StatusCreated)
+	require.Equal(t, http.StatusCreated, i.statusCode)
+
+	// Second call is a no-op
+	i.WriteHeader(http.StatusNotFound)
+	require.Equal(t, http.StatusCreated, i.statusCode)
+}
+
+func TestWriteTriggersWriteHeader(t *testing.T) {
+	tx := newTestTransaction(t)
+	defer tx.Close()
+
+	rec := httptest.NewRecorder()
+	i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+	n, err := i.Write([]byte("hello"))
+	require.NoError(t, err)
+	require.Equal(t, 5, n)
+	require.True(t, i.wroteHeader)
+}
+
+func TestCleanHeaders(t *testing.T) {
+	tx := newTestTransaction(t)
+	defer tx.Close()
+
+	rec := httptest.NewRecorder()
+	i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+	i.Header().Set("X-Test", "value")
+	i.Header().Set("X-Other", "other")
+	require.NotEmpty(t, rec.Header())
+
+	i.cleanHeaders()
+	require.Empty(t, rec.Header())
+}
+
+func TestFlushWriteHeader(t *testing.T) {
+	tx := newTestTransaction(t)
+	defer tx.Close()
+
+	rec := httptest.NewRecorder()
+	i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 201}
+
+	require.False(t, i.isWriteHeaderFlush)
+	i.flushWriteHeader()
+	require.True(t, i.isWriteHeaderFlush)
+	require.Equal(t, 201, rec.Code)
+
+	// Second call is a no-op
+	i.flushWriteHeader()
+	require.True(t, i.isWriteHeaderFlush)
+}
+
+// Mock types for testing wrap interface preservation.
+
+type plainResponseWriter struct{ http.ResponseWriter }
+
+type hijackerResponseWriter struct{ http.ResponseWriter }
+
+func (hijackerResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) { return nil, nil, nil }
+
+type pusherResponseWriter struct{ http.ResponseWriter }
+
+func (pusherResponseWriter) Push(string, *http.PushOptions) error { return nil }
+
+type hijackerPusherResponseWriter struct{ http.ResponseWriter }
+
+func (hijackerPusherResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return nil, nil, nil
+}
+
+func (hijackerPusherResponseWriter) Push(string, *http.PushOptions) error { return nil }
+
+func TestWrapPreservesInterfaces(t *testing.T) {
+	req, _ := http.NewRequest("GET", "/", nil)
+	rec := httptest.NewRecorder()
+
+	tests := []struct {
+		name       string
+		rw         http.ResponseWriter
+		wantHijack bool
+		wantPush   bool
+	}{
+		{"plain writer", plainResponseWriter{rec}, false, false},
+		{"hijacker writer", hijackerResponseWriter{rec}, true, false},
+		{"pusher writer", pusherResponseWriter{rec}, false, true},
+		{"hijacker+pusher writer", hijackerPusherResponseWriter{rec}, true, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := newTestTransaction(t)
+			defer tx.Close()
+
+			wrapped, processResp := wrap(tt.rw, req, tx)
+			require.NotNil(t, processResp)
+
+			_, isHijacker := wrapped.(http.Hijacker)
+			require.Equal(t, tt.wantHijack, isHijacker)
+
+			_, isPusher := wrapped.(http.Pusher)
+			require.Equal(t, tt.wantPush, isPusher)
+
+			// All wrapped writers should implement Flusher
+			_, isFlusher := wrapped.(http.Flusher)
+			require.True(t, isFlusher)
+		})
+	}
+}
+
+func TestResponseProcessor(t *testing.T) {
+	t.Run("body not accessible flushes header", func(t *testing.T) {
+		waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+		require.NoError(t, err)
+		tx := waf.NewTransaction()
+		defer tx.Close()
+
+		rec := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/", nil)
+
+		_, processResp := wrap(rec, req, tx)
+		require.NoError(t, processResp(tx, req))
+	})
+
+	t.Run("body accessible writes buffered body", func(t *testing.T) {
+		waf, err := coraza.NewWAF(coraza.NewWAFConfig().WithDirectives(`
+SecRuleEngine On
+SecResponseBodyAccess On
+SecResponseBodyMimeType text/plain
+`))
+		require.NoError(t, err)
+		tx := waf.NewTransaction()
+		defer tx.Close()
+
+		rec := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/", nil)
+
+		ww, processResp := wrap(rec, req, tx)
+		ww.Header().Set("Content-Type", "text/plain")
+		ww.WriteHeader(http.StatusOK)
+		_, err = ww.Write([]byte("safe content"))
+		require.NoError(t, err)
+
+		require.NoError(t, processResp(tx, req))
+	})
+}
 
 // TestConcurrentFlushDoesNotBlock verifies that calling Flush() on many
 // concurrent streams does not block, even when response body buffering is
@@ -26,8 +251,6 @@ func TestConcurrentFlushDoesNotBlock(t *testing.T) {
 	const streams = 100
 
 	t.Run("buffered response body (early-return path)", func(t *testing.T) {
-		// WAF with response body inspection enabled — Flush() should
-		// early-return while the body is still being buffered.
 		waf := newWAF(t, `
 			SecRuleEngine On
 			SecResponseBodyAccess On
@@ -38,8 +261,6 @@ func TestConcurrentFlushDoesNotBlock(t *testing.T) {
 	})
 
 	t.Run("non-buffered response body (real-flush path)", func(t *testing.T) {
-		// WAF with response body inspection disabled — Flush() should
-		// delegate to the underlying writer's Flush().
 		waf := newWAF(t, `
 			SecRuleEngine On
 			SecResponseBodyAccess Off
@@ -157,6 +378,49 @@ func finishStream(t *testing.T, s *streamState) {
 	if body != expected {
 		t.Errorf("body mismatch: got %q, want %q", body, expected)
 	}
+}
+
+func TestWriteWhenInterrupted(t *testing.T) {
+	waf := newWAF(t, `
+		SecRuleEngine On
+		SecRule REQUEST_URI "/blocked" "id:1,phase:1,deny,status:403"
+	`)
+	tx := waf.NewTransaction()
+	defer tx.Close()
+
+	// Trigger phase-1 interruption via request headers
+	req, _ := http.NewRequest("GET", "/blocked", nil)
+	req.Host = "example.com"
+	it, err := processRequest(tx, req)
+	require.NoError(t, err)
+	require.NotNil(t, it, "expected phase-1 interruption")
+
+	rec := httptest.NewRecorder()
+	i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+	data := []byte("this should not be written")
+	n, writeErr := i.Write(data)
+	require.NoError(t, writeErr)
+	require.Equal(t, len(data), n)
+	require.Empty(t, rec.Body.String(), "no data should reach the underlying writer")
+}
+
+func TestFlushDelegatesToUnderlyingFlusher(t *testing.T) {
+	waf := newWAF(t, `
+		SecRuleEngine On
+		SecResponseBodyAccess Off
+	`)
+	tx := waf.NewTransaction()
+	defer tx.Close()
+
+	rec := httptest.NewRecorder()
+	i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+	i.WriteHeader(http.StatusOK)
+	i.Flush()
+
+	require.True(t, i.isWriteHeaderFlush, "status code should have been flushed")
+	require.True(t, rec.Flushed, "underlying http.Flusher should have been called")
 }
 
 // TestConcurrentStreamingResponseFlush uses real HTTP connections to verify
