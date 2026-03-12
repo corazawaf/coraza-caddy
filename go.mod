@@ -7,7 +7,7 @@ require (
 	github.com/corazawaf/coraza-coreruleset/v4 v4.21.0
 	github.com/corazawaf/coraza/v3 v3.3.3
 	github.com/jcchavezs/mergefs v0.1.1
-	github.com/magefile/mage v1.16.0
+	github.com/magefile/mage v1.16.1
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.27.1
 )
