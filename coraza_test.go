@@ -365,7 +365,7 @@ func TestResponseBody(t *testing.T) {
 			content:                   contentWithoutDataLeak,
 			responseBodyRelativeLimit: -1,
 			responseBodyLimitAction:   limitActionReject,
-			expectedStatusCode:        http.StatusRequestEntityTooLarge, // changed to http.StatusInternalServerError at https://github.com/corazawaf/coraza/pull/1379
+			expectedStatusCode:        http.StatusInternalServerError, // changed from http.StatusRequestEntityTooLarge at https://github.com/corazawaf/coraza/pull/1379
 		},
 		{
 			name:                      "JustEqualToLimitAndAccepts",
@@ -373,9 +373,10 @@ func TestResponseBody(t *testing.T) {
 			responseBodyRelativeLimit: 0,
 			responseBodyLimitAction:   limitActionReject,
 			// NOTE: According to https://coraza.io/docs/seclang/directives/#secresponsebodylimit
-			// expectedStatusCode should be http.StatusOK, but actually it is http.StatusRequestEntityTooLarge.
-			// Coraza should be fixed.
-			expectedStatusCode: http.StatusRequestEntityTooLarge,
+			// expectedStatusCode should be http.StatusOK, but actually it triggers the limit.
+			// Status changed from http.StatusRequestEntityTooLarge to http.StatusInternalServerError
+			// at https://github.com/corazawaf/coraza/pull/1379.
+			expectedStatusCode: http.StatusInternalServerError,
 		},
 		{
 			name:                      "OneByteShorterThanLimitAndAccepts",
