@@ -37,10 +37,6 @@ SecUploadDir %s
 	req := buildLargeMultipartRequest(t, 512*1024 /* 512 KB > 131072 byte limit */)
 
 	tx := waf.NewTransaction()
-	defer func() {
-		tx.ProcessLogging()
-		require.NoError(t, tx.Close())
-	}()
 
 	tx.ProcessConnection("127.0.0.1", 12345, "", 0)
 	tx.ProcessURI("/upload", "POST", "HTTP/1.1")
@@ -59,8 +55,13 @@ SecUploadDir %s
 	require.NoError(t, err)
 	require.NotEmpty(t, midFiles, "expected crzmp* temp file to exist after body processing")
 
-	// tx.Close() is invoked by the deferred function above.
-	// After it returns, no crzmp* files should remain in uploadDir.
+	tx.ProcessLogging()
+	require.NoError(t, tx.Close())
+
+	// After tx.Close(), no crzmp* files should remain in uploadDir.
+	afterFiles, err := filepath.Glob(filepath.Join(uploadDir, "crzmp*"))
+	require.NoError(t, err)
+	require.Empty(t, afterFiles, "crzmp* temp files must be cleaned up by tx.Close()")
 }
 
 // TestMultipartTempFilesCleanedUpWhenBodyProcessorFails verifies the core
