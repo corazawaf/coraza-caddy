@@ -805,15 +805,17 @@ func TestRegularRequestStillProcessesResponseBody(t *testing.T) {
 	tx.ProcessConnection("127.0.0.1", 12345, "", 0)
 	tx.ProcessURI("/", "GET", "HTTP/1.1")
 	tx.ProcessRequestHeaders()
-	tx.ProcessRequestBody()
+	_, err := tx.ProcessRequestBody()
+	require.NoError(t, err)
 
 	wrapped, processResponse := wrap(rec, r, tx)
 
 	wrapped.Header().Set("Content-Type", "text/plain")
 	wrapped.WriteHeader(http.StatusOK)
-	wrapped.Write([]byte("blocked-content"))
+	_, err = wrapped.Write([]byte("blocked-content"))
+	require.NoError(t, err)
 
-	err := processResponse(tx, r)
+	err = processResponse(tx, r)
 	// The rule should have triggered and returned an error
 	require.Error(t, err, "response body rule should still trigger for non-WebSocket requests")
 }
