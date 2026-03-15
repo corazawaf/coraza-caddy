@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -20,7 +21,7 @@ import (
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/jcchavezs/mergefs"
-	"github.com/jcchavezs/mergefs/io"
+	mergefsio "github.com/jcchavezs/mergefs/io"
 	"go.uber.org/zap"
 )
 
@@ -43,6 +44,9 @@ type pooledWAF struct {
 }
 
 func (p *pooledWAF) Destruct() error {
+	if c, ok := p.waf.(io.Closer); ok {
+		c.Close()
+	}
 	p.waf = nil
 	return nil
 }
@@ -97,7 +101,7 @@ func (m *corazaModule) buildWAF() (coraza.WAF, error) {
 		WithDebugLogger(newLogger(m.logger))
 
 	if m.LoadOWASPCRS {
-		config = config.WithRootFS(mergefs.Merge(coreruleset.FS, io.OSFS))
+		config = config.WithRootFS(mergefs.Merge(coreruleset.FS, mergefsio.OSFS))
 	}
 
 	if m.Directives != "" {
