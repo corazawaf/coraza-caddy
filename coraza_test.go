@@ -266,6 +266,41 @@ func TestCleanup(t *testing.T) {
 	require.False(t, exists, "pool entry should be removed after Cleanup")
 }
 
+// closerWAF wraps a coraza.WAF and tracks whether Close was called.
+type closerWAF struct {
+	corazaWAF.WAF
+	closed bool
+}
+
+func (c *closerWAF) Close() error {
+	c.closed = true
+	return nil
+}
+
+func TestDestructCallsClose(t *testing.T) {
+	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+	require.NoError(t, err)
+
+	cw := &closerWAF{WAF: waf}
+	pw := &pooledWAF{waf: cw}
+
+	require.NoError(t, pw.Destruct())
+	require.True(t, cw.closed, "Destruct should call Close on WAFs implementing io.Closer")
+	require.Nil(t, pw.waf, "waf should be nil after Destruct")
+}
+
+func TestDestructWithoutCloser(t *testing.T) {
+	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+	require.NoError(t, err)
+
+	pw := &pooledWAF{waf: waf}
+
+	// Current coraza.WAF may or may not implement io.Closer depending
+	// on the version. Destruct must not panic either way.
+	require.NoError(t, pw.Destruct())
+	require.Nil(t, pw.waf, "waf should be nil after Destruct")
+}
+
 func TestUsagePoolReuse(t *testing.T) {
 	// Simulate two modules with the same config — they should share a WAF.
 	m1 := &corazaModule{
