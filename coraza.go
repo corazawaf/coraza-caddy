@@ -100,6 +100,9 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	var id string
 	if m.TxIDReqHeader != "" {
 		id = r.Header.Get(m.TxIDReqHeader)
+		if id == "" {
+			id = randomString(16)
+		}
 	} else {
 		id = randomString(16)
 	}
