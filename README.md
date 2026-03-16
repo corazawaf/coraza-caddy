@@ -11,7 +11,7 @@ OWASP Coraza WAF is 100% compatible with OWASP Coreruleset and Modsecurity synta
 
 If you’re looking for installation guidance, tuning, false-positive handling, or
 deployment best practices for CRS, refer to the official OWASP CRS documentation.
-
+https://coreruleset.org/docs/
 This repository focuses on Coraza integration and runtime behavior rather than
 maintaining CRS rule documentation.
 
