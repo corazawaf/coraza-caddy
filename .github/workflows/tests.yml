@@ -8,26 +8,32 @@ on:
       - "**/*.md"
       - "LICENSE"
   pull_request:
+    branches:
+      - main
     paths-ignore:
       - "**/*.md"
       - "LICENSE"
+
+permissions: {}
 
 jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.23.x]
+        go-version: [1.25.x, 1.26.x]
         os: [ubuntu-latest]
-        xcaddy-version: [v0.3.5]
+        xcaddy-version: [v0.4.5]
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     steps:
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ matrix.go-version }}
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           lfs: true
           fetch-depth: 0 #for better blame info
@@ -47,8 +53,8 @@ jobs:
       - name: Run regression tests (ftw)
         run: go run mage.go ftw
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         if: success() || failure()
         with:
-          name: ftw-caddy-logs
+          name: ftw-caddy-logs-${{ matrix.go-version }}
           path: build/ftw-caddy.log
