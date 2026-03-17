@@ -787,13 +787,13 @@ func TestRegularRequestStillProcessesResponseBody(t *testing.T) {
 	tx.ProcessConnection("127.0.0.1", 12345, "", 0)
 	tx.ProcessURI("/", "GET", "HTTP/1.1")
 	tx.ProcessRequestHeaders()
-	tx.ProcessRequestBody()
+	_, _ = tx.ProcessRequestBody()
 
 	wrapped, processResponse := wrap(rec, r, tx)
 
 	wrapped.Header().Set("Content-Type", "text/plain")
 	wrapped.WriteHeader(http.StatusOK)
-	wrapped.Write([]byte("blocked-content"))
+	_, _ = wrapped.Write([]byte("blocked-content"))
 
 	err := processResponse(tx, r)
 	// The rule should have triggered and returned an error
