@@ -11,23 +11,29 @@ on:
         description: "caddy version (branch, tag or commit)"
         required: true
 
+permissions: {}
+
 jobs:
   nightly-caddy:
     name: "Nightly Caddy (caddy version: ${{ github.event.inputs.caddyversion || 'master' }})"
     strategy:
       matrix:
-        go-version: [1.23.x]
+        go-version: [1.25.x, 1.26.x]
         os: [ubuntu-latest]
         xcaddy-version: [v0.3.5]
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    env:
+      CADDY_VERSION: ${{ github.event.inputs.caddyversion || 'master' }}
     steps:
       - name: Install Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6
         with:
           go-version: ${{ matrix.go-version }}
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           lfs: true
           fetch-depth: 0 #for better blame info
@@ -36,7 +42,7 @@ jobs:
         run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@${{ matrix.xcaddy-version }}
 
       - name: Build caddy
-        run: CADDY_VERSION=${{ github.event.inputs.caddyversion || 'master' }} go run mage.go buildCaddyLinux
+        run: CADDY_VERSION="${CADDY_VERSION}" go run mage.go buildCaddyLinux
 
       - name: Run e2e tests
         run: go run mage.go e2e
