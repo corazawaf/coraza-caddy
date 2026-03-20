@@ -598,6 +598,22 @@ func testStreamingFlush(t *testing.T, waf coraza.WAF, streams, numChunks int, co
 	}
 }
 
+// writeHeaderTracker wraps httptest.ResponseRecorder and records whether
+// WriteHeader was actually called on the underlying writer.
+type writeHeaderTracker struct {
+	*httptest.ResponseRecorder
+	writeHeaderCalled bool
+}
+
+func (w *writeHeaderTracker) WriteHeader(code int) {
+	w.writeHeaderCalled = true
+	w.ResponseRecorder.WriteHeader(code)
+}
+
+func newWriteHeaderTracker() *writeHeaderTracker {
+	return &writeHeaderTracker{ResponseRecorder: httptest.NewRecorder()}
+}
+
 // hijackableRecorder extends httptest.ResponseRecorder with http.Hijacker support
 // to simulate what a real HTTP server connection provides.
 type hijackableRecorder struct {
@@ -676,7 +692,7 @@ func TestNonWebSocketResponseDoesNotFlushImmediately(t *testing.T) {
 	tx := waf.NewTransaction()
 	defer tx.Close()
 
-	rec := httptest.NewRecorder()
+	rec := newWriteHeaderTracker()
 	r, _ := http.NewRequest("GET", "/", nil)
 
 	wrapped, _ := wrap(rec, r, tx)
@@ -685,8 +701,10 @@ func TestNonWebSocketResponseDoesNotFlushImmediately(t *testing.T) {
 	wrapped.WriteHeader(http.StatusOK)
 
 	// For normal responses with body access, the status should NOT be flushed yet
-	// (it's deferred until body processing is done)
-	require.Equal(t, http.StatusOK, rec.Code)
+	// (it's deferred until body processing is done). We verify by checking that
+	// WriteHeader was never called on the underlying writer.
+	require.False(t, rec.writeHeaderCalled,
+		"underlying WriteHeader should not be called immediately for non-WebSocket responses")
 }
 
 func TestHijackTrackerSetsIsHijacked(t *testing.T) {
@@ -787,15 +805,17 @@ func TestRegularRequestStillProcessesResponseBody(t *testing.T) {
 	tx.ProcessConnection("127.0.0.1", 12345, "", 0)
 	tx.ProcessURI("/", "GET", "HTTP/1.1")
 	tx.ProcessRequestHeaders()
-	_, _ = tx.ProcessRequestBody()
+	_, err := tx.ProcessRequestBody()
+	require.NoError(t, err)
 
 	wrapped, processResponse := wrap(rec, r, tx)
 
 	wrapped.Header().Set("Content-Type", "text/plain")
 	wrapped.WriteHeader(http.StatusOK)
-	_, _ = wrapped.Write([]byte("blocked-content"))
+	_, err = wrapped.Write([]byte("blocked-content"))
+	require.NoError(t, err)
 
-	err := processResponse(tx, r)
+	err = processResponse(tx, r)
 	// The rule should have triggered and returned an error
 	require.Error(t, err, "response body rule should still trigger for non-WebSocket requests")
 }
