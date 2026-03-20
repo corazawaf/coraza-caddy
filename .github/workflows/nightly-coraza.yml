@@ -6,6 +6,8 @@ on:
   schedule:
     - cron: "0 4 * * *"
 
+permissions: {}
+
 jobs:
   nightly-coraza:
     strategy:
@@ -14,14 +16,16 @@ jobs:
         os: [ubuntu-latest]
         xcaddy-version: [v0.4.5]
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     steps:
       - name: Install Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
         with:
           go-version: ${{ matrix.go-version }}
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
           lfs: true
           fetch-depth: 0 #for better blame info
