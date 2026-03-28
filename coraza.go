@@ -169,7 +169,9 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	tx := m.waf.NewTransactionWithID(id)
 	defer func() {
 		tx.ProcessLogging()
-		_ = tx.Close()
+		if err := tx.Close(); err != nil {
+			m.logger.Warn("Failed to close the transaction", zap.String("tx_id", tx.ID()), zap.Error(err))
+		}
 	}()
 
 	// Early return, Coraza is not going to process any rule

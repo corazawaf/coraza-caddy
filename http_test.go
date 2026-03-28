@@ -60,6 +60,25 @@ SecRule REQUEST_HEADERS:Transfer-Encoding "chunked" "id:100,phase:1,deny,status:
 	require.Equal(t, 403, it.Status)
 }
 
+func TestProcessRequestMultipleTransferEncodings(t *testing.T) {
+	// Multiple Transfer-Encoding values are a classic HTTP request smuggling vector (TE.TE attacks).
+	// All values should be forwarded to the WAF.
+	waf, _ := coraza.NewWAF(coraza.NewWAFConfig().
+		WithDirectives(`
+SecRule REQUEST_HEADERS:Transfer-Encoding "@contains identity" "id:1,phase:1,deny"
+`))
+	tx := waf.NewTransaction()
+
+	req, _ := http.NewRequest("GET", "https://www.coraza.io/test", nil)
+	req.TransferEncoding = []string{"chunked", "identity"}
+
+	it, err := processRequest(tx, req)
+	require.NoError(t, err)
+	require.NotNil(t, it, "Expected interruption: second Transfer-Encoding value should be processed")
+	require.Equal(t, 1, it.RuleID, "Expected rule 1 to be triggered")
+	require.NoError(t, tx.Close())
+}
+
 func TestParseServerName(t *testing.T) {
 	require.Equal(t, "www.example.com", parseServerName("www.example.com"))
 	require.Equal(t, "1.2.3.4", parseServerName("1.2.3.4:80"))

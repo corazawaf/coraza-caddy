@@ -6,6 +6,7 @@ package coraza
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -21,7 +22,9 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddytest"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	corazaWAF "github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -365,7 +368,7 @@ func TestResponseBody(t *testing.T) {
 			content:                   contentWithoutDataLeak,
 			responseBodyRelativeLimit: -1,
 			responseBodyLimitAction:   limitActionReject,
-			expectedStatusCode:        http.StatusRequestEntityTooLarge, // changed to http.StatusInternalServerError at https://github.com/corazawaf/coraza/pull/1379
+			expectedStatusCode:        http.StatusInternalServerError, // changed from http.StatusRequestEntityTooLarge at https://github.com/corazawaf/coraza/pull/1379
 		},
 		{
 			name:                      "JustEqualToLimitAndAccepts",
@@ -373,9 +376,10 @@ func TestResponseBody(t *testing.T) {
 			responseBodyRelativeLimit: 0,
 			responseBodyLimitAction:   limitActionReject,
 			// NOTE: According to https://coraza.io/docs/seclang/directives/#secresponsebodylimit
-			// expectedStatusCode should be http.StatusOK, but actually it is http.StatusRequestEntityTooLarge.
-			// Coraza should be fixed.
-			expectedStatusCode: http.StatusRequestEntityTooLarge,
+			// expectedStatusCode should be http.StatusOK, but actually it triggers the limit.
+			// Status changed from http.StatusRequestEntityTooLarge to http.StatusInternalServerError
+			// at https://github.com/corazawaf/coraza/pull/1379.
+			expectedStatusCode: http.StatusInternalServerError,
 		},
 		{
 			name:                      "OneByteShorterThanLimitAndAccepts",
@@ -486,4 +490,68 @@ func TestResponseBody(t *testing.T) {
 			}
 		})
 	}
+}
+
+// txCloseErrWrapper wraps a real Coraza transaction and overrides Close to
+// return a configurable error. This lets tests verify that ServeHTTP logs a
+// warning when tx.Close() fails, without needing to reach into Coraza internals.
+type txCloseErrWrapper struct {
+	types.Transaction
+	closeErr error
+}
+
+func (t *txCloseErrWrapper) Close() error {
+	// Close the real transaction to release its resources, then return the
+	// configured error so callers observe a Close failure.
+	if err := t.Transaction.Close(); err != nil {
+		return errors.Join(err, t.closeErr)
+	}
+	return t.closeErr
+}
+
+// mockWAF wraps a real Coraza WAF and injects a txCloseErrWrapper on every
+// NewTransactionWithID call so that Close() returns the given error.
+type mockWAF struct {
+	real     corazaWAF.WAF
+	closeErr error
+}
+
+func (m *mockWAF) NewTransaction() types.Transaction {
+	return &txCloseErrWrapper{Transaction: m.real.NewTransaction(), closeErr: m.closeErr}
+}
+
+func (m *mockWAF) NewTransactionWithID(id string) types.Transaction {
+	return &txCloseErrWrapper{Transaction: m.real.NewTransactionWithID(id), closeErr: m.closeErr}
+}
+
+// TestServeHTTP_txCloseErrorIsLogged verifies that when tx.Close() returns an
+// error, ServeHTTP emits a Warn-level log entry instead of silently discarding
+// the error.
+func TestServeHTTP_txCloseErrorIsLogged(t *testing.T) {
+	// Use SecRuleEngine Off so ServeHTTP skips all rule processing and Caddy
+	// context requirements, giving us a clean path to the defer cleanup.
+	realWAF, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine Off"))
+	require.NoError(t, err)
+
+	closeErr := errors.New("simulated close error")
+	waf := &mockWAF{real: realWAF, closeErr: closeErr}
+
+	core, logs := observer.New(zapcore.WarnLevel)
+	m := corazaModule{
+		waf:    waf,
+		logger: zap.New(core),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	noopHandler := caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error { return nil })
+
+	require.NoError(t, m.ServeHTTP(w, req, noopHandler))
+
+	require.Equal(t, 1, logs.Len(), "expected exactly one log entry")
+	entry := logs.All()[0]
+	require.Equal(t, zapcore.WarnLevel, entry.Level)
+	require.Equal(t, "Failed to close the transaction", entry.Message)
+	require.NotEmpty(t, entry.ContextMap()["tx_id"], "tx_id field must be present")
+	require.Equal(t, closeErr.Error(), entry.ContextMap()["error"], "error field must match")
 }
