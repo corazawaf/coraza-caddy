@@ -41,6 +41,9 @@ jobs:
       - name: Tests and coverage
         run: go run mage.go coverage
 
+      - name: Tests with memoization disabled
+        run: go test -tags=coraza.no_memoize -count=1 ./...
+
       - name: Install xcaddy
         run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@${{ matrix.xcaddy-version }}
 
