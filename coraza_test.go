@@ -289,14 +289,14 @@ func TestDestructCallsClose(t *testing.T) {
 	require.Nil(t, pw.waf, "waf should be nil after Destruct")
 }
 
-func TestDestructWithoutCloser(t *testing.T) {
+func TestDestructNilsWAFField(t *testing.T) {
 	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
 	require.NoError(t, err)
 
 	pw := &pooledWAF{waf: waf}
 
-	// Current coraza.WAF may or may not implement io.Closer depending
-	// on the version. Destruct must not panic either way.
+	// Destruct must not panic and must nil the waf field regardless of
+	// whether the underlying WAF implements io.Closer.
 	require.NoError(t, pw.Destruct())
 	require.Nil(t, pw.waf, "waf should be nil after Destruct")
 }

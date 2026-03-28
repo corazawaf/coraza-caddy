@@ -44,11 +44,14 @@ type pooledWAF struct {
 }
 
 func (p *pooledWAF) Destruct() error {
+	var err error
 	if c, ok := p.waf.(io.Closer); ok {
-		c.Close()
+		if cerr := c.Close(); cerr != nil {
+			err = fmt.Errorf("closing WAF: %w", cerr)
+		}
 	}
 	p.waf = nil
-	return nil
+	return err
 }
 
 // corazaModule is a Web Application Firewall implementation for Caddy.
