@@ -17,13 +17,19 @@ import (
 
 // hijackerTracker wraps an http.Hijacker and tracks whether Hijack has been called.
 type hijackerTracker struct {
-	w           http.ResponseWriter
+	hijacker    http.Hijacker
 	interceptor *rwInterceptor
 }
 
+// Hijack delegates to the underlying http.Hijacker and marks the interceptor
+// as hijacked on success, so that response processing is skipped.
 func (h *hijackerTracker) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	conn, rw, err := h.hijacker.Hijack()
+	if err != nil {
+		return conn, rw, err
+	}
 	h.interceptor.isHijacked = true
-	return h.w.(http.Hijacker).Hijack()
+	return conn, rw, nil
 }
 
 // Copied from https://github.com/corazawaf/coraza/blob/main/http/interceptor.go
@@ -38,6 +44,7 @@ type rwInterceptor struct {
 	wroteHeader                   bool
 	wroteBufferedBodyToDownstream bool
 	isHijacked                    bool
+	allowFlushing                 bool
 }
 
 // WriteHeader records the status code to be sent right before the moment
@@ -58,6 +65,7 @@ func (i *rwInterceptor) WriteHeader(statusCode int) {
 
 	if it := i.tx.ProcessResponseHeaders(statusCode, i.proto); it != nil {
 		i.cleanHeaders()
+		i.Header().Set("Content-Length", "0")
 		i.statusCode = obtainStatusCodeFromInterruptionOrDefault(it, i.statusCode)
 		i.flushWriteHeader()
 		return
@@ -71,6 +79,11 @@ func (i *rwInterceptor) WriteHeader(statusCode int) {
 	}
 
 	i.wroteHeader = true
+	if !i.tx.IsResponseBodyAccessible() || !i.tx.IsResponseBodyProcessable() {
+		// if the response body isn't accessible or processable we can already allow flushing
+		// we need to set this flag before the first call to Flush()
+		i.allowFlushing = true
+	}
 }
 
 // overrideWriteHeader overrides the recorded status code
@@ -122,10 +135,10 @@ func (i *rwInterceptor) Write(b []byte) (int, error) {
 		if it != nil {
 			// if there is an interruption we must clean the headers and override the status code
 			i.cleanHeaders()
+			i.Header().Set("Content-Length", "0")
 			i.overrideWriteHeader(obtainStatusCodeFromInterruptionOrDefault(it, i.statusCode))
 			// We only flush the status code after an interruption.
 			i.flushWriteHeader()
-
 			// We return the number of bytes as according to the interface io.Writer
 			// if we don't return an error, the number of bytes written is len(p).
 			// See https://pkg.go.dev/io#Writer
@@ -162,17 +175,14 @@ func (i *rwInterceptor) Flush() {
 		i.WriteHeader(http.StatusOK)
 	}
 
-	// If we are still buffering the response body for inspection, we must not
-	// flush the status code to the downstream writer yet. Doing so would
-	// prevent us from changing the status code if a later rule triggers an
-	// interruption (e.g. phase 4 deny).
-	if i.tx.IsResponseBodyAccessible() && i.tx.IsResponseBodyProcessable() && !i.wroteBufferedBodyToDownstream {
-		return
-	}
+	if i.allowFlushing {
+		if i.isWriteHeaderFlush {
+			// only propagate flush if the headers have been flushed already
+			if fl, ok := i.w.(http.Flusher); ok {
+				fl.Flush()
+			}
+		}
 
-	i.flushWriteHeader()
-	if flusher, ok := i.w.(http.Flusher); ok {
-		flusher.Flush()
 	}
 }
 
@@ -257,6 +267,7 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 			} else if it != nil {
 				// if there is an interruption we must clean the headers and override the status code
 				i.cleanHeaders()
+				i.Header().Set("Content-Length", "0")
 				code := obtainStatusCodeFromInterruptionOrDefault(it, i.statusCode)
 				i.overrideWriteHeader(code)
 				i.flushWriteHeader()
@@ -270,6 +281,7 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 
 			return i.writeBufferedResponseBodyToDownstream()
 		} else {
+			i.allowFlushing = true
 			i.flushWriteHeader()
 		}
 
@@ -277,13 +289,9 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 	}
 
 	var (
-		_, isHijacker    = i.w.(http.Hijacker)
-		pusher, isPusher = i.w.(http.Pusher)
+		hijacker, isHijacker = i.w.(http.Hijacker)
+		pusher, isPusher     = i.w.(http.Pusher)
 	)
-
-	// hijackTracker wraps the underlying http.Hijacker so that we can detect
-	// when the connection has been hijacked (e.g. for WebSocket upgrades).
-	hijackTracker := &hijackerTracker{w: i.w, interceptor: i}
 
 	switch {
 	case !isHijacker && isPusher:
@@ -295,13 +303,13 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 		return struct {
 			responseWriter
 			http.Hijacker
-		}{i, hijackTracker}, responseProcessor
+		}{i, &hijackerTracker{hijacker: hijacker, interceptor: i}}, responseProcessor
 	case isHijacker && isPusher:
 		return struct {
 			responseWriter
 			http.Hijacker
 			http.Pusher
-		}{i, hijackTracker, pusher}, responseProcessor
+		}{i, &hijackerTracker{hijacker: hijacker, interceptor: i}, pusher}, responseProcessor
 	default:
 		return struct {
 			responseWriter
