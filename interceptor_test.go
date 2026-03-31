@@ -417,6 +417,8 @@ func TestFlushDelegatesToUnderlyingFlusher(t *testing.T) {
 	i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
 
 	i.WriteHeader(http.StatusOK)
+	// Write triggers flushWriteHeader for the non-buffered path
+	i.Write([]byte("data"))
 	i.Flush()
 
 	require.True(t, i.isWriteHeaderFlush, "status code should have been flushed")
@@ -785,6 +787,36 @@ func TestWebSocketUpgradeDetectionOnly(t *testing.T) {
 
 	err = processResponse(tx, r)
 	require.NoError(t, err, "processResponse should succeed for WebSocket in DetectionOnly mode")
+}
+
+// failingHijacker simulates a Hijack() that fails.
+type failingHijacker struct {
+	*httptest.ResponseRecorder
+}
+
+func (f *failingHijacker) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return nil, nil, fmt.Errorf("hijack not supported")
+}
+
+func TestHijackFailureDoesNotSkipResponseProcessing(t *testing.T) {
+	waf := newWAF(t, `SecRuleEngine On`)
+	tx := waf.NewTransaction()
+	defer tx.Close()
+
+	rec := &failingHijacker{ResponseRecorder: httptest.NewRecorder()}
+	r, _ := http.NewRequest("GET", "/", nil)
+
+	wrapped, processResponse := wrap(rec, r, tx)
+
+	hijacker, ok := wrapped.(http.Hijacker)
+	require.True(t, ok, "should implement http.Hijacker")
+
+	_, _, err := hijacker.Hijack()
+	require.Error(t, err, "Hijack should fail")
+
+	// processResponse should still work since hijack failed
+	err = processResponse(tx, r)
+	require.NoError(t, err, "processResponse should still run when Hijack fails")
 }
 
 func TestRegularRequestStillProcessesResponseBody(t *testing.T) {
