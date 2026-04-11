@@ -272,6 +272,13 @@ type closerWAF struct {
 	closed bool
 }
 
+// noCloser wraps a coraza.WAF without exposing io.Closer, so that the
+// non-closer branch of Destruct() is reliably exercised.
+type noCloser struct{ inner corazaWAF.WAF }
+
+func (n noCloser) NewTransaction() types.Transaction            { return n.inner.NewTransaction() }
+func (n noCloser) NewTransactionWithID(id string) types.Transaction { return n.inner.NewTransactionWithID(id) }
+
 func (c *closerWAF) Close() error {
 	c.closed = true
 	return nil
@@ -293,10 +300,10 @@ func TestDestructNilsWAFField(t *testing.T) {
 	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
 	require.NoError(t, err)
 
-	pw := &pooledWAF{waf: waf}
+	// Wrap in noCloser to guarantee the non-io.Closer path is exercised,
+	// regardless of whether the underlying coraza.WAF implements io.Closer.
+	pw := &pooledWAF{waf: noCloser{inner: waf}}
 
-	// Destruct must not panic and must nil the waf field regardless of
-	// whether the underlying WAF implements io.Closer.
 	require.NoError(t, pw.Destruct())
 	require.Nil(t, pw.waf, "waf should be nil after Destruct")
 }
