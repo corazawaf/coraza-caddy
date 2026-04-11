@@ -5,6 +5,8 @@ package coraza
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -12,13 +14,21 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddytest"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
+	corazaWAF "github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/types"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 const baseURL = "http://127.0.0.1:8080"
@@ -189,6 +199,137 @@ func TestUnmarshalCaddyfile(t *testing.T) {
 	}
 }
 
+func TestProvision(t *testing.T) {
+	newCtx := func(t *testing.T) caddy.Context {
+		t.Helper()
+		ctx, cancel := caddy.NewContext(caddy.Context{Context: context.Background()})
+		t.Cleanup(cancel)
+		return ctx
+	}
+
+	t.Run("basic directives", func(t *testing.T) {
+		m := &corazaModule{Directives: "SecRuleEngine On"}
+		require.NoError(t, m.Provision(newCtx(t)))
+		require.NotNil(t, m.waf)
+	})
+
+	t.Run("include file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		ruleFile := filepath.Join(tmpDir, "rules.conf")
+		require.NoError(t, os.WriteFile(ruleFile, []byte("SecRuleEngine On"), 0644))
+
+		m := &corazaModule{Include: []string{ruleFile}}
+		require.NoError(t, m.Provision(newCtx(t)))
+		require.NotNil(t, m.waf)
+	})
+
+	t.Run("include glob", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		for i := range 2 {
+			ruleFile := filepath.Join(tmpDir, fmt.Sprintf("rule%d.conf", i))
+			require.NoError(t, os.WriteFile(ruleFile, []byte("SecRuleEngine On"), 0644))
+		}
+
+		m := &corazaModule{Include: []string{filepath.Join(tmpDir, "*.conf")}}
+		require.NoError(t, m.Provision(newCtx(t)))
+		require.NotNil(t, m.waf)
+	})
+
+	t.Run("invalid directives", func(t *testing.T) {
+		m := &corazaModule{Directives: "SecInvalidDirective foo"}
+		require.Error(t, m.Provision(newCtx(t)))
+	})
+}
+
+func TestCleanup(t *testing.T) {
+	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+	require.NoError(t, err)
+
+	poolKey := "test-cleanup-key"
+	// Store the WAF in the pool so Cleanup can release it.
+	wafPool.LoadOrStore(poolKey, &pooledWAF{waf: waf})
+
+	m := &corazaModule{
+		waf:     waf,
+		logger:  zap.NewNop(),
+		poolKey: poolKey,
+	}
+
+	require.NotNil(t, m.waf, "waf should be set before Cleanup")
+	require.NotNil(t, m.logger, "logger should be set before Cleanup")
+
+	// Cleanup delegates to the pool; the module fields are left as-is.
+	require.NoError(t, m.Cleanup())
+
+	// Pool entry should have been deleted (ref count was 1).
+	_, exists := wafPool.References(poolKey)
+	require.False(t, exists, "pool entry should be removed after Cleanup")
+}
+
+func TestUsagePoolReuse(t *testing.T) {
+	// Simulate two modules with the same config — they should share a WAF.
+	m1 := &corazaModule{
+		Directives: "SecRuleEngine On",
+	}
+	m2 := &corazaModule{
+		Directives: "SecRuleEngine On",
+	}
+
+	require.Equal(t, m1.computePoolKey(), m2.computePoolKey(),
+		"identical configs must produce the same pool key")
+
+	// Different config should produce a different key.
+	m3 := &corazaModule{
+		Directives:   "SecRuleEngine On",
+		LoadOWASPCRS: true,
+	}
+	require.NotEqual(t, m1.computePoolKey(), m3.computePoolKey(),
+		"different configs must produce different pool keys")
+}
+
+func TestNewErrorCb(t *testing.T) {
+	tests := []struct {
+		name          string
+		severity      int // ModSecurity severity: 0=emergency ... 7=debug
+		expectedLevel zapcore.Level
+	}{
+		{"emergency", 0, zapcore.ErrorLevel},
+		{"alert", 1, zapcore.ErrorLevel},
+		{"critical", 2, zapcore.ErrorLevel},
+		{"error", 3, zapcore.ErrorLevel},
+		{"warning", 4, zapcore.WarnLevel},
+		{"notice", 5, zapcore.InfoLevel},
+		{"info", 6, zapcore.InfoLevel},
+		{"debug", 7, zapcore.DebugLevel},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core, logs := observer.New(zapcore.DebugLevel)
+
+			waf, err := corazaWAF.NewWAF(
+				corazaWAF.NewWAFConfig().
+					WithErrorCallback(newErrorCb(zap.New(core))).
+					WithDirectives(fmt.Sprintf(
+						`SecRuleEngine On
+						SecRule REQUEST_URI "/trigger" "id:1,phase:1,pass,log,severity:%d"`,
+						tt.severity,
+					)),
+			)
+			require.NoError(t, err)
+
+			tx := waf.NewTransaction()
+			tx.ProcessURI("/trigger", "GET", "HTTP/1.1")
+			tx.ProcessRequestHeaders()
+			tx.ProcessLogging()
+			tx.Close()
+
+			require.GreaterOrEqual(t, logs.Len(), 1)
+			require.Equal(t, tt.expectedLevel, logs.All()[0].Level)
+		})
+	}
+}
+
 func TestResponseBody(t *testing.T) {
 	findFreePort := func(t *testing.T) int {
 		t.Helper()
@@ -227,7 +368,7 @@ func TestResponseBody(t *testing.T) {
 			content:                   contentWithoutDataLeak,
 			responseBodyRelativeLimit: -1,
 			responseBodyLimitAction:   limitActionReject,
-			expectedStatusCode:        http.StatusRequestEntityTooLarge, // changed to http.StatusInternalServerError at https://github.com/corazawaf/coraza/pull/1379
+			expectedStatusCode:        http.StatusInternalServerError, // changed from http.StatusRequestEntityTooLarge at https://github.com/corazawaf/coraza/pull/1379
 		},
 		{
 			name:                      "JustEqualToLimitAndAccepts",
@@ -235,9 +376,10 @@ func TestResponseBody(t *testing.T) {
 			responseBodyRelativeLimit: 0,
 			responseBodyLimitAction:   limitActionReject,
 			// NOTE: According to https://coraza.io/docs/seclang/directives/#secresponsebodylimit
-			// expectedStatusCode should be http.StatusOK, but actually it is http.StatusRequestEntityTooLarge.
-			// Coraza should be fixed.
-			expectedStatusCode: http.StatusRequestEntityTooLarge,
+			// expectedStatusCode should be http.StatusOK, but actually it triggers the limit.
+			// Status changed from http.StatusRequestEntityTooLarge to http.StatusInternalServerError
+			// at https://github.com/corazawaf/coraza/pull/1379.
+			expectedStatusCode: http.StatusInternalServerError,
 		},
 		{
 			name:                      "OneByteShorterThanLimitAndAccepts",
@@ -348,4 +490,68 @@ func TestResponseBody(t *testing.T) {
 			}
 		})
 	}
+}
+
+// txCloseErrWrapper wraps a real Coraza transaction and overrides Close to
+// return a configurable error. This lets tests verify that ServeHTTP logs a
+// warning when tx.Close() fails, without needing to reach into Coraza internals.
+type txCloseErrWrapper struct {
+	types.Transaction
+	closeErr error
+}
+
+func (t *txCloseErrWrapper) Close() error {
+	// Close the real transaction to release its resources, then return the
+	// configured error so callers observe a Close failure.
+	if err := t.Transaction.Close(); err != nil {
+		return errors.Join(err, t.closeErr)
+	}
+	return t.closeErr
+}
+
+// mockWAF wraps a real Coraza WAF and injects a txCloseErrWrapper on every
+// NewTransactionWithID call so that Close() returns the given error.
+type mockWAF struct {
+	real     corazaWAF.WAF
+	closeErr error
+}
+
+func (m *mockWAF) NewTransaction() types.Transaction {
+	return &txCloseErrWrapper{Transaction: m.real.NewTransaction(), closeErr: m.closeErr}
+}
+
+func (m *mockWAF) NewTransactionWithID(id string) types.Transaction {
+	return &txCloseErrWrapper{Transaction: m.real.NewTransactionWithID(id), closeErr: m.closeErr}
+}
+
+// TestServeHTTP_txCloseErrorIsLogged verifies that when tx.Close() returns an
+// error, ServeHTTP emits a Warn-level log entry instead of silently discarding
+// the error.
+func TestServeHTTP_txCloseErrorIsLogged(t *testing.T) {
+	// Use SecRuleEngine Off so ServeHTTP skips all rule processing and Caddy
+	// context requirements, giving us a clean path to the defer cleanup.
+	realWAF, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine Off"))
+	require.NoError(t, err)
+
+	closeErr := errors.New("simulated close error")
+	waf := &mockWAF{real: realWAF, closeErr: closeErr}
+
+	core, logs := observer.New(zapcore.WarnLevel)
+	m := corazaModule{
+		waf:    waf,
+		logger: zap.New(core),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	noopHandler := caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error { return nil })
+
+	require.NoError(t, m.ServeHTTP(w, req, noopHandler))
+
+	require.Equal(t, 1, logs.Len(), "expected exactly one log entry")
+	entry := logs.All()[0]
+	require.Equal(t, zapcore.WarnLevel, entry.Level)
+	require.Equal(t, "Failed to close the transaction", entry.Message)
+	require.NotEmpty(t, entry.ContextMap()["tx_id"], "tx_id field must be present")
+	require.Equal(t, closeErr.Error(), entry.ContextMap()["error"], "error field must match")
 }
