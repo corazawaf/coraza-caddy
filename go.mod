@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/caddyserver/caddy/v2 v2.11.2
-	github.com/corazawaf/coraza-coreruleset/v4 v4.24.1
+	github.com/corazawaf/coraza-coreruleset/v4 v4.25.0
 	github.com/corazawaf/coraza/v3 v3.7.0
 	github.com/jcchavezs/mergefs v0.1.1
 	github.com/magefile/mage v1.17.1
