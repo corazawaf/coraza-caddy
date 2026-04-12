@@ -57,9 +57,10 @@ func (p *pooledWAF) Destruct() error {
 // corazaModule is a Web Application Firewall implementation for Caddy.
 type corazaModule struct {
 	// deprecated
-	Include      []string `json:"include"`
-	Directives   string   `json:"directives"`
-	LoadOWASPCRS bool     `json:"load_owasp_crs"`
+	Include       []string `json:"include"`
+	Directives    string   `json:"directives"`
+	LoadOWASPCRS  bool     `json:"load_owasp_crs"`
+	TxIDReqHeader string   `json:"tx_id_req_header"`
 
 	logger  *zap.Logger
 	waf     coraza.WAF
@@ -172,7 +173,16 @@ var errInterruptionTriggered = errors.New("interruption triggered")
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	id := randomString(16)
+	var id string
+	if m.TxIDReqHeader != "" {
+		id = r.Header.Get(m.TxIDReqHeader)
+		if id == "" {
+			id = randomString(16)
+		}
+	} else {
+		id = randomString(16)
+	}
+
 	tx := m.waf.NewTransactionWithID(id)
 	defer func() {
 		tx.ProcessLogging()
@@ -256,6 +266,19 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 			case "directives":
 				m.Directives = value
 			}
+		case "tx_id_req_header":
+			var value string
+			if !d.Args(&value) {
+				// not enough args
+				return d.ArgErr()
+			}
+
+			if d.NextArg() {
+				// too many args
+				return d.ArgErr()
+			}
+
+			m.TxIDReqHeader = value
 		default:
 			return d.Errf("invalid key %q", key)
 		}
