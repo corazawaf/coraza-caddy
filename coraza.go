@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -20,7 +21,7 @@ import (
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/jcchavezs/mergefs"
-	"github.com/jcchavezs/mergefs/io"
+	mergefsio "github.com/jcchavezs/mergefs/io"
 	"go.uber.org/zap"
 )
 
@@ -43,8 +44,14 @@ type pooledWAF struct {
 }
 
 func (p *pooledWAF) Destruct() error {
+	var err error
+	if c, ok := p.waf.(io.Closer); ok {
+		if cerr := c.Close(); cerr != nil {
+			err = fmt.Errorf("closing WAF: %w", cerr)
+		}
+	}
 	p.waf = nil
-	return nil
+	return err
 }
 
 // corazaModule is a Web Application Firewall implementation for Caddy.
@@ -98,7 +105,7 @@ func (m *corazaModule) buildWAF() (coraza.WAF, error) {
 		WithDebugLogger(newLogger(m.logger))
 
 	if m.LoadOWASPCRS {
-		config = config.WithRootFS(mergefs.Merge(coreruleset.FS, io.OSFS))
+		config = config.WithRootFS(mergefs.Merge(coreruleset.FS, mergefsio.OSFS))
 	}
 
 	if m.Directives != "" {
@@ -179,7 +186,9 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	tx := m.waf.NewTransactionWithID(id)
 	defer func() {
 		tx.ProcessLogging()
-		_ = tx.Close()
+		if err := tx.Close(); err != nil {
+			m.logger.Warn("Failed to close the transaction", zap.String("tx_id", tx.ID()), zap.Error(err))
+		}
 	}()
 
 	// Early return, Coraza is not going to process any rule
@@ -302,6 +311,8 @@ func newErrorCb(logger *zap.Logger) func(types.MatchedRule) {
 			logger.Info(logMsg)
 		case types.RuleSeverityDebug:
 			logger.Debug(logMsg)
+		default:
+			logger.Warn(logMsg)
 		}
 	}
 }

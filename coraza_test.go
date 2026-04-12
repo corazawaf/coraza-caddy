@@ -6,6 +6,7 @@ package coraza
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -21,7 +22,9 @@ import (
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddytest"
+	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	corazaWAF "github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/types"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -263,6 +266,74 @@ func TestCleanup(t *testing.T) {
 	require.False(t, exists, "pool entry should be removed after Cleanup")
 }
 
+// closerWAF wraps a coraza.WAF and tracks whether Close was called.
+type closerWAF struct {
+	corazaWAF.WAF
+	closed bool
+}
+
+// noCloser wraps a coraza.WAF without exposing io.Closer, so that the
+// non-closer branch of Destruct() is reliably exercised.
+type noCloser struct{ inner corazaWAF.WAF }
+
+func (n noCloser) NewTransaction() types.Transaction {
+	return n.inner.NewTransaction()
+}
+
+func (n noCloser) NewTransactionWithID(id string) types.Transaction {
+	return n.inner.NewTransactionWithID(id)
+}
+
+func (c *closerWAF) Close() error {
+	c.closed = true
+	return nil
+}
+
+// errCloser wraps a coraza.WAF and always returns an error from Close.
+type errCloser struct {
+	corazaWAF.WAF
+	err error
+}
+
+func (e *errCloser) Close() error { return e.err }
+
+func TestDestructCallsClose(t *testing.T) {
+	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+	require.NoError(t, err)
+
+	cw := &closerWAF{WAF: waf}
+	pw := &pooledWAF{waf: cw}
+
+	require.NoError(t, pw.Destruct())
+	require.True(t, cw.closed, "Destruct should call Close on WAFs implementing io.Closer")
+	require.Nil(t, pw.waf, "waf should be nil after Destruct")
+}
+
+func TestDestructNilsWAFField(t *testing.T) {
+	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+	require.NoError(t, err)
+
+	// Wrap in noCloser to guarantee the non-io.Closer path is exercised,
+	// regardless of whether the underlying coraza.WAF implements io.Closer.
+	pw := &pooledWAF{waf: noCloser{inner: waf}}
+
+	require.NoError(t, pw.Destruct())
+	require.Nil(t, pw.waf, "waf should be nil after Destruct")
+}
+
+func TestDestructPropagatesCloseError(t *testing.T) {
+	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+	require.NoError(t, err)
+
+	closeErr := errors.New("close failed")
+	ec := &errCloser{WAF: waf, err: closeErr}
+	pw := &pooledWAF{waf: ec}
+
+	destructErr := pw.Destruct()
+	require.ErrorIs(t, destructErr, closeErr, "Destruct should propagate the Close error")
+	require.Nil(t, pw.waf, "waf should be nil after Destruct even when Close fails")
+}
+
 func TestUsagePoolReuse(t *testing.T) {
 	// Simulate two modules with the same config — they should share a WAF.
 	m1 := &corazaModule{
@@ -325,6 +396,31 @@ func TestNewErrorCb(t *testing.T) {
 			require.Equal(t, tt.expectedLevel, logs.All()[0].Level)
 		})
 	}
+
+	// Rules without an explicit severity get RuleSeverityUnset (-1) since coraza v3.7.0.
+	// Previously they defaulted to 0 (Emergency). The error callback must still log them.
+	t.Run("unset", func(t *testing.T) {
+		core, logs := observer.New(zapcore.DebugLevel)
+
+		waf, err := corazaWAF.NewWAF(
+			corazaWAF.NewWAFConfig().
+				WithErrorCallback(newErrorCb(zap.New(core))).
+				WithDirectives(
+					`SecRuleEngine On
+					SecRule REQUEST_URI "/trigger" "id:1,phase:1,pass,log"`,
+				),
+		)
+		require.NoError(t, err)
+
+		tx := waf.NewTransaction()
+		tx.ProcessURI("/trigger", "GET", "HTTP/1.1")
+		tx.ProcessRequestHeaders()
+		tx.ProcessLogging()
+		tx.Close()
+
+		require.GreaterOrEqual(t, logs.Len(), 1)
+		require.Equal(t, zapcore.WarnLevel, logs.All()[0].Level)
+	})
 }
 
 func TestResponseBody(t *testing.T) {
@@ -506,4 +602,68 @@ func TestTxIDReqHeader(t *testing.T) {
 	if got, want := res.Header.Get("x-request-id"), txID; got != want {
 		t.Errorf("transaction ID mismatch, got=%v, want=%v", got, want)
 	}
+}
+
+// txCloseErrWrapper wraps a real Coraza transaction and overrides Close to
+// return a configurable error. This lets tests verify that ServeHTTP logs a
+// warning when tx.Close() fails, without needing to reach into Coraza internals.
+type txCloseErrWrapper struct {
+	types.Transaction
+	closeErr error
+}
+
+func (t *txCloseErrWrapper) Close() error {
+	// Close the real transaction to release its resources, then return the
+	// configured error so callers observe a Close failure.
+	if err := t.Transaction.Close(); err != nil {
+		return errors.Join(err, t.closeErr)
+	}
+	return t.closeErr
+}
+
+// mockWAF wraps a real Coraza WAF and injects a txCloseErrWrapper on every
+// NewTransactionWithID call so that Close() returns the given error.
+type mockWAF struct {
+	real     corazaWAF.WAF
+	closeErr error
+}
+
+func (m *mockWAF) NewTransaction() types.Transaction {
+	return &txCloseErrWrapper{Transaction: m.real.NewTransaction(), closeErr: m.closeErr}
+}
+
+func (m *mockWAF) NewTransactionWithID(id string) types.Transaction {
+	return &txCloseErrWrapper{Transaction: m.real.NewTransactionWithID(id), closeErr: m.closeErr}
+}
+
+// TestServeHTTP_txCloseErrorIsLogged verifies that when tx.Close() returns an
+// error, ServeHTTP emits a Warn-level log entry instead of silently discarding
+// the error.
+func TestServeHTTP_txCloseErrorIsLogged(t *testing.T) {
+	// Use SecRuleEngine Off so ServeHTTP skips all rule processing and Caddy
+	// context requirements, giving us a clean path to the defer cleanup.
+	realWAF, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine Off"))
+	require.NoError(t, err)
+
+	closeErr := errors.New("simulated close error")
+	waf := &mockWAF{real: realWAF, closeErr: closeErr}
+
+	core, logs := observer.New(zapcore.WarnLevel)
+	m := corazaModule{
+		waf:    waf,
+		logger: zap.New(core),
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	noopHandler := caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error { return nil })
+
+	require.NoError(t, m.ServeHTTP(w, req, noopHandler))
+
+	require.Equal(t, 1, logs.Len(), "expected exactly one log entry")
+	entry := logs.All()[0]
+	require.Equal(t, zapcore.WarnLevel, entry.Level)
+	require.Equal(t, "Failed to close the transaction", entry.Message)
+	require.NotEmpty(t, entry.ContextMap()["tx_id"], "tx_id field must be present")
+	require.Equal(t, closeErr.Error(), entry.ContextMap()["error"], "error field must match")
 }
