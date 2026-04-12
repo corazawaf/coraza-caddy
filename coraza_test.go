@@ -289,6 +289,14 @@ func (c *closerWAF) Close() error {
 	return nil
 }
 
+// errCloser wraps a coraza.WAF and always returns an error from Close.
+type errCloser struct {
+	corazaWAF.WAF
+	err error
+}
+
+func (e *errCloser) Close() error { return e.err }
+
 func TestDestructCallsClose(t *testing.T) {
 	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
 	require.NoError(t, err)
@@ -311,6 +319,19 @@ func TestDestructNilsWAFField(t *testing.T) {
 
 	require.NoError(t, pw.Destruct())
 	require.Nil(t, pw.waf, "waf should be nil after Destruct")
+}
+
+func TestDestructPropagatesCloseError(t *testing.T) {
+	waf, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine On"))
+	require.NoError(t, err)
+
+	closeErr := errors.New("close failed")
+	ec := &errCloser{WAF: waf, err: closeErr}
+	pw := &pooledWAF{waf: ec}
+
+	destructErr := pw.Destruct()
+	require.ErrorIs(t, destructErr, closeErr, "Destruct should propagate the Close error")
+	require.Nil(t, pw.waf, "waf should be nil after Destruct even when Close fails")
 }
 
 func TestUsagePoolReuse(t *testing.T) {
