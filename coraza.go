@@ -19,6 +19,7 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
 	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/experimental/plugins/plugintypes"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/jcchavezs/mergefs"
 	mergefsio "github.com/jcchavezs/mergefs/io"
@@ -190,6 +191,15 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
 	repl.Set("http.transaction_id", id)
+
+	// Populate TX:ja4_fingerprint from caddy-ja4 module if available.
+	// This allows rules to match on the JA4 TLS fingerprint, e.g.:
+	//   SecRule TX:ja4_fingerprint "@streq t13d..." "id:100,phase:1,deny"
+	if ja4, ok := caddyhttp.GetVar(r.Context(), "ja4").(string); ok && ja4 != "" {
+		if ts, ok := tx.(plugintypes.TransactionState); ok {
+			ts.Variables().TX().Set("ja4_fingerprint", []string{ja4})
+		}
+	}
 
 	// ProcessRequest is just a wrapper around ProcessConnection, ProcessURI,
 	// ProcessRequestHeaders and ProcessRequestBody.
