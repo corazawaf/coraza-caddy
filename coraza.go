@@ -200,6 +200,8 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 			ts.Variables().TX().Set("ja4_fingerprint", []string{ja4})
 		}
 	}
+	server := r.Context().Value(caddyhttp.ServerCtxKey).(*caddyhttp.Server)
+	caddyhttp.PrepareRequest(r, repl, w, server)
 
 	// ProcessRequest is just a wrapper around ProcessConnection, ProcessURI,
 	// ProcessRequestHeaders and ProcessRequestBody.
