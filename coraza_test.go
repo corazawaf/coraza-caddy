@@ -136,6 +136,89 @@ func TestClientIpRule(t *testing.T) {
 	tester.AssertResponseCode(req, 403)
 }
 
+// TestPrepareRequestResolvesClientIPFromXFF verifies that when a request
+// arrives from a trusted proxy (RemoteAddr in private_ranges) with an
+// X-Forwarded-For header, caddyhttp.PrepareRequest resolves the client_ip
+// variable to the forwarded IP rather than RemoteAddr, and this value flows
+// through the replacer and into the WAF via getClientAddress.
+func TestPrepareRequestResolvesClientIPFromXFF(t *testing.T) {
+	findFreePort := func(t *testing.T) int {
+		t.Helper()
+		ln, err := net.Listen("tcp", ":0")
+		require.NoError(t, err)
+		addr := ln.Addr().String()
+		ln.Close()
+		_, portStr, _ := net.SplitHostPort(addr)
+		port, _ := strconv.Atoi(portStr)
+		return port
+	}
+
+	caddyPort := findFreePort(t)
+	caddyAdminPort := caddytest.Default.AdminPort
+
+	tester := caddytest.NewTester(t)
+	config := fmt.Sprintf(`{
+		admin localhost:%d
+		auto_https off
+		order coraza_waf first
+		servers {
+			trusted_proxies static private_ranges
+		}
+	}
+
+	:%d {
+		coraza_waf {
+			directives `+"`"+`SecRuleEngine On`+"`"+`
+		}
+		header X-Client-IP "{http.vars.client_ip}"
+		respond "ok"
+	}`, caddyAdminPort, caddyPort)
+
+	tester.InitServer(config, "caddyfile")
+
+	tests := []struct {
+		name             string
+		xff              string
+		expectedClientIP string
+	}{
+		{
+			name:             "XFF resolves to forwarded IP",
+			xff:              "10.20.30.40",
+			expectedClientIP: "10.20.30.40",
+		},
+		{
+			name:             "no XFF falls back to RemoteAddr",
+			xff:              "",
+			expectedClientIP: "127.0.0.1",
+		},
+		{
+			name:             "XFF with multiple IPs uses leftmost",
+			xff:              "192.0.2.1, 10.0.0.1",
+			expectedClientIP: "192.0.2.1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest("GET", fmt.Sprintf("http://127.0.0.1:%d/", caddyPort), nil)
+			require.NoError(t, err)
+			if tt.xff != "" {
+				req.Header.Set("X-Forwarded-For", tt.xff)
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			gotClientIP := resp.Header.Get("X-Client-IP")
+			require.Equal(t, tt.expectedClientIP, gotClientIP,
+				"client_ip should be resolved from X-Forwarded-For when RemoteAddr is a trusted proxy")
+		})
+	}
+}
+
 func newTester(caddyfile string, t *testing.T) *caddytest.Tester {
 	tester := caddytest.NewTester(t)
 	configContent, err := os.ReadFile(caddyfile)
