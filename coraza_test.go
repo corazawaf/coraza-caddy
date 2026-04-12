@@ -276,8 +276,13 @@ type closerWAF struct {
 // non-closer branch of Destruct() is reliably exercised.
 type noCloser struct{ inner corazaWAF.WAF }
 
-func (n noCloser) NewTransaction() types.Transaction            { return n.inner.NewTransaction() }
-func (n noCloser) NewTransactionWithID(id string) types.Transaction { return n.inner.NewTransactionWithID(id) }
+func (n noCloser) NewTransaction() types.Transaction {
+	return n.inner.NewTransaction()
+}
+
+func (n noCloser) NewTransactionWithID(id string) types.Transaction {
+	return n.inner.NewTransactionWithID(id)
+}
 
 func (c *closerWAF) Close() error {
 	c.closed = true
