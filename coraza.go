@@ -281,6 +281,8 @@ func newErrorCb(logger *zap.Logger) func(types.MatchedRule) {
 			logger.Info(logMsg)
 		case types.RuleSeverityDebug:
 			logger.Debug(logMsg)
+		default:
+			logger.Warn(logMsg)
 		}
 	}
 }

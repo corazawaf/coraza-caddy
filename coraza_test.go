@@ -328,6 +328,31 @@ func TestNewErrorCb(t *testing.T) {
 			require.Equal(t, tt.expectedLevel, logs.All()[0].Level)
 		})
 	}
+
+	// Rules without an explicit severity get RuleSeverityUnset (-1) since coraza v3.7.0.
+	// Previously they defaulted to 0 (Emergency). The error callback must still log them.
+	t.Run("unset", func(t *testing.T) {
+		core, logs := observer.New(zapcore.DebugLevel)
+
+		waf, err := corazaWAF.NewWAF(
+			corazaWAF.NewWAFConfig().
+				WithErrorCallback(newErrorCb(zap.New(core))).
+				WithDirectives(
+					`SecRuleEngine On
+					SecRule REQUEST_URI "/trigger" "id:1,phase:1,pass,log"`,
+				),
+		)
+		require.NoError(t, err)
+
+		tx := waf.NewTransaction()
+		tx.ProcessURI("/trigger", "GET", "HTTP/1.1")
+		tx.ProcessRequestHeaders()
+		tx.ProcessLogging()
+		tx.Close()
+
+		require.GreaterOrEqual(t, logs.Len(), 1)
+		require.Equal(t, zapcore.WarnLevel, logs.All()[0].Level)
+	})
 }
 
 func TestResponseBody(t *testing.T) {
