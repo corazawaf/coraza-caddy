@@ -418,7 +418,7 @@ func TestFlushDelegatesToUnderlyingFlusher(t *testing.T) {
 
 	i.WriteHeader(http.StatusOK)
 	// Write triggers flushWriteHeader for the non-buffered path
-	i.Write([]byte("data"))
+	_, _ = i.Write([]byte("data"))
 	i.Flush()
 
 	require.True(t, i.isWriteHeaderFlush, "status code should have been flushed")
