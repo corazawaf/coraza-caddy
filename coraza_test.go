@@ -731,3 +731,73 @@ func TestServeHTTP_txCloseErrorIsLogged(t *testing.T) {
 	require.NotEmpty(t, entry.ContextMap()["tx_id"], "tx_id field must be present")
 	require.Equal(t, closeErr.Error(), entry.ContextMap()["error"], "error field must match")
 }
+
+// TestServeHTTP_JA4FingerprintSetInTX verifies that when the ja4 context
+// variable is present (as set by the caddy-ja4 listener wrapper), it is
+// propagated to TX:ja4_fingerprint so SecRules can match on it.
+func TestServeHTTP_JA4FingerprintSetInTX(t *testing.T) {
+	const testJA4 = "t13d1517h2_8daaf6152771_b6f405a00624"
+
+	tests := []struct {
+		name               string
+		ja4                string
+		expectedStatusCode int
+	}{
+		{
+			name:               "JA4 present triggers matching rule",
+			ja4:                testJA4,
+			expectedStatusCode: http.StatusForbidden,
+		},
+		{
+			name:               "JA4 absent skips rule",
+			ja4:                "",
+			expectedStatusCode: http.StatusOK,
+		},
+		{
+			name:               "non-matching JA4 skips rule",
+			ja4:                "t13d0000h2_0000000000_000000000000",
+			expectedStatusCode: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			waf, err := corazaWAF.NewWAF(
+				corazaWAF.NewWAFConfig().WithDirectives(fmt.Sprintf(
+					`SecRuleEngine On
+					SecRule TX:ja4_fingerprint "@streq %s" "id:100,phase:1,deny,status:403"`, testJA4)),
+			)
+			require.NoError(t, err)
+
+			m := corazaModule{
+				waf:    waf,
+				logger: zap.NewNop(),
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.RemoteAddr = "127.0.0.1:12345"
+
+			// Build context with replacer and vars as Caddy's PrepareRequest would.
+			ctx := context.WithValue(req.Context(), caddy.ReplacerCtxKey, caddy.NewReplacer())
+			vars := map[string]any{}
+			if tt.ja4 != "" {
+				vars["ja4"] = tt.ja4
+			}
+			ctx = context.WithValue(ctx, caddyhttp.VarsCtxKey, vars)
+			req = req.WithContext(ctx)
+
+			w := httptest.NewRecorder()
+			noopHandler := caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error { return nil })
+
+			err = m.ServeHTTP(w, req, noopHandler)
+
+			if tt.expectedStatusCode == http.StatusOK {
+				require.NoError(t, err)
+			} else {
+				var handlerErr caddyhttp.HandlerError
+				require.ErrorAs(t, err, &handlerErr)
+				require.Equal(t, tt.expectedStatusCode, handlerErr.StatusCode)
+			}
+		})
+	}
+}
