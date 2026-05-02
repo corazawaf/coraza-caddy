@@ -9,7 +9,7 @@ require (
 	github.com/jcchavezs/mergefs v0.1.1
 	github.com/magefile/mage v1.17.1
 	github.com/stretchr/testify v1.11.1
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 )
 
 require (
