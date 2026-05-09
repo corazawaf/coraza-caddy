@@ -19,6 +19,7 @@ import (
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
 	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/experimental"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/jcchavezs/mergefs"
 	mergefsio "github.com/jcchavezs/mergefs/io"
@@ -61,9 +62,10 @@ type corazaModule struct {
 	Directives   string   `json:"directives"`
 	LoadOWASPCRS bool     `json:"load_owasp_crs"`
 
-	logger  *zap.Logger
-	waf     coraza.WAF
-	poolKey string
+	CaddyVars []string `json:"caddy_vars,omitempty"`
+	logger    *zap.Logger
+	waf       coraza.WAF
+	poolKey   string
 }
 
 // CaddyModule returns the Caddy module information.
@@ -172,8 +174,7 @@ var errInterruptionTriggered = errors.New("interruption triggered")
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	id := randomString(16)
-	tx := m.waf.NewTransactionWithID(id)
+	tx := m.newTX(r)
 	defer func() {
 		tx.ProcessLogging()
 		if err := tx.Close(); err != nil {
@@ -189,10 +190,12 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	}
 
 	repl := r.Context().Value(caddy.ReplacerCtxKey).(*caddy.Replacer)
-	repl.Set("http.transaction_id", id)
+	repl.Set("http.transaction_id", tx.ID())
 
 	server := r.Context().Value(caddyhttp.ServerCtxKey).(*caddyhttp.Server)
 	caddyhttp.PrepareRequest(r, repl, w, server)
+
+	m.injectCaddyValues(r.Context(), tx)
 
 	// ProcessRequest is just a wrapper around ProcessConnection, ProcessURI,
 	// ProcessRequestHeaders and ProcessRequestBody.
@@ -241,6 +244,15 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				return d.ArgErr()
 			}
 			m.LoadOWASPCRS = true
+		case "expand_caddy_placeholders":
+			m.CaddyVars = d.RemainingArgs()
+			if len(m.CaddyVars) == 0 {
+				return d.ArgErr()
+			}
+			repl := caddy.NewReplacer()
+			for i := range m.CaddyVars {
+				m.CaddyVars[i] = repl.ReplaceAll(m.CaddyVars[i], "")
+			}
 		case "directives", "include":
 			var value string
 			if !d.Args(&value) {
@@ -264,7 +276,22 @@ func (m *corazaModule) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 		}
 	}
 
+	m.processCaddyPlaceholders()
+
 	return nil
+}
+
+func (m *corazaModule) newTX(r *http.Request) types.Transaction {
+	id := randomString(16)
+
+	if ctxwaf, ok := m.waf.(experimental.WAFWithOptions); ok {
+		return ctxwaf.NewTransactionWithOptions(experimental.Options{
+			ID:      id,
+			Context: r.Context(),
+		})
+	}
+
+	return m.waf.NewTransactionWithID(id)
 }
 
 // parseCaddyfile unmarshals tokens from h into a new Middleware.
