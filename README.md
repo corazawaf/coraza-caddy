@@ -133,6 +133,44 @@ go run mage.go buildCaddy
 curl -i localhost:8080/
 ```
 
+## JA4 TLS Fingerprinting
+
+When the [caddy-ja4](https://github.com/matt-/caddy-ja4) module is compiled into Caddy, the JA4 TLS fingerprint is automatically made available to Coraza rules as `TX:ja4_fingerprint`. This enables bot detection, client classification, and TLS-based blocking without any changes to the Coraza engine.
+
+### Build Caddy with both modules
+
+```shell
+xcaddy build --with github.com/corazawaf/coraza-caddy/v2 --with github.com/matt-/caddy-ja4
+```
+
+### Configure the listener wrapper
+
+The `ja4` listener wrapper must appear **before** the `tls` wrapper so it can observe the raw ClientHello:
+
+```caddy
+{
+    order coraza_waf first
+    servers {
+        listener_wrappers {
+            ja4
+            tls
+        }
+    }
+}
+```
+
+### Write rules using TX:ja4_fingerprint
+
+```
+SecRule TX:ja4_fingerprint "@streq t13d1517h2_8daaf6152771_b6f405a00624" \
+    "id:100,phase:1,deny,log,msg:'Blocked JA4 fingerprint'"
+
+SecRule TX:ja4_fingerprint "@rx ^t13d1517h2_" \
+    "id:101,phase:1,deny,log,msg:'Blocked JA4 fingerprint prefix'"
+```
+
+If caddy-ja4 is not compiled in or the request lacks a TLS handshake (e.g. plaintext HTTP), `TX:ja4_fingerprint` is simply not set and the rules are skipped.
+
 ## Respond with custom message or HTML page
 
 In order to respond with a custom message or HTML page, you can take advantage of [handle_errors](https://caddyserver.com/docs/caddyfile/directives/handle_errors) directive:
