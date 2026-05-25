@@ -204,10 +204,11 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 			Err:        err,
 		}
 	} else if it != nil {
+		client, _ := getClientAddress(r)
 		m.logger.Error("WAF rule violation detected",
 			zap.String("hostname", r.Host),
 			zap.String("uri", r.RequestURI),
-			zap.String("client_ip", r.RemoteAddr),
+			zap.String("client_ip", client),
 			zap.String("unique_id", tx.ID()),
 		)
 		return caddyhttp.HandlerError{
