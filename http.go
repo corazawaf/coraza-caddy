@@ -18,9 +18,11 @@ func processRequest(tx types.Transaction, req *http.Request) (*types.Interruptio
 
 	client, cport := getClientAddress(req)
 
+	realhost := extractRealHostname(req)
+
 	var in *types.Interruption
 	// There is no socket access in the request object, so we neither know the server client nor port.
-	tx.ProcessConnection(client, cport, "", 0)
+	tx.ProcessConnection(client, cport, realhost, 0)
 	tx.ProcessURI(req.URL.String(), req.Method, req.Proto)
 	for k, vr := range req.Header {
 		for _, v := range vr {
@@ -30,10 +32,10 @@ func processRequest(tx types.Transaction, req *http.Request) (*types.Interruptio
 
 	// Host will always be removed from req.Headers() and promoted to the
 	// Request.Host field, so we manually add it
-	if req.Host != "" {
-		tx.AddRequestHeader("Host", req.Host)
+	if realhost != "" {
+		tx.AddRequestHeader("Host", realhost)
 		// This connector relies on the host header (now host field) to populate ServerName
-		tx.SetServerName(parseServerName(req.Host))
+		tx.SetServerName(parseServerName(realhost))
 	}
 
 	// Transfer-Encoding header is removed by go/http
@@ -106,4 +108,18 @@ func parseServerName(host string) string {
 	}
 	// anyways serverName is returned
 	return serverName
+}
+
+// Extracts the real host name from the HTTP request,
+func extractRealHostname(req *http.Request) (string) {
+
+	// Get the host name, from the default Host request header
+	hostname := req.Host
+
+	// If X-Forwarded-Host exists I overwrite the Host
+	if xfh := req.Header.Get("X-Forwarded-Host"); xfh != "" {
+		hostname = xfh
+	}
+
+	return hostname
 }
