@@ -173,14 +173,13 @@ var errInterruptionTriggered = errors.New("interruption triggered")
 
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
-	var id string
-	if m.TxIDReqHeader != "" {
-		id = r.Header.Get(m.TxIDReqHeader)
-		if id == "" {
-			id = randomString(16)
+	id := randomString(16)
+	if header := strings.TrimSpace(m.TxIDReqHeader); header != "" {
+		if candidate := strings.TrimSpace(r.Header.Get(header)); candidate != "" &&
+			len(candidate) <= 128 &&
+			!strings.ContainsAny(candidate, "\r\n") {
+			id = candidate
 		}
-	} else {
-		id = randomString(16)
 	}
 
 	tx := m.waf.NewTransactionWithID(id)

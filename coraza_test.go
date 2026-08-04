@@ -671,20 +671,49 @@ func TestResponseBody(t *testing.T) {
 func TestTxIDReqHeader(t *testing.T) {
 	tester := newTester("test2.init.config", t)
 
-	req, err := http.NewRequest("GET", baseURL+"/test", nil)
-	if err != nil {
-		t.Fatalf("unable to create request %s", err)
-	}
+	t.Run("uses header value as transaction ID", func(t *testing.T) {
+		req, err := http.NewRequest("GET", baseURL+"/test", nil)
+		if err != nil {
+			t.Fatalf("unable to create request %s", err)
+		}
 
-	// In real use case, this header should be set by a HTTP proxy before coraza, not by a client.
-	txID := "transaction1"
-	req.Header.Add("my-tx-id", txID)
+		// In real use case, this header should be set by a HTTP proxy before coraza, not by a client.
+		txID := "transaction1"
+		req.Header.Add("my-tx-id", txID)
 
-	res, _ := tester.AssertResponse(req, 200, "test123")
+		res, _ := tester.AssertResponse(req, 200, "test123")
 
-	if got, want := res.Header.Get("x-request-id"), txID; got != want {
-		t.Errorf("transaction ID mismatch, got=%v, want=%v", got, want)
-	}
+		if got, want := res.Header.Get("x-request-id"), txID; got != want {
+			t.Errorf("transaction ID mismatch, got=%v, want=%v", got, want)
+		}
+	})
+
+	t.Run("falls back when header missing", func(t *testing.T) {
+		req, err := http.NewRequest("GET", baseURL+"/test", nil)
+		if err != nil {
+			t.Fatalf("unable to create request %s", err)
+		}
+
+		res, _ := tester.AssertResponse(req, 200, "test123")
+
+		if got := res.Header.Get("x-request-id"); got == "" {
+			t.Errorf("expected a generated request ID, got empty string")
+		}
+	})
+
+	t.Run("falls back when header empty", func(t *testing.T) {
+		req, err := http.NewRequest("GET", baseURL+"/test", nil)
+		if err != nil {
+			t.Fatalf("unable to create request %s", err)
+		}
+		req.Header.Set("my-tx-id", "")
+
+		res, _ := tester.AssertResponse(req, 200, "test123")
+
+		if got := res.Header.Get("x-request-id"); got == "" {
+			t.Errorf("expected a generated request ID, got empty string")
+		}
+	})
 }
 
 // txCloseErrWrapper wraps a real Coraza transaction and overrides Close to
