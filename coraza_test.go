@@ -668,6 +668,133 @@ func TestResponseBody(t *testing.T) {
 	}
 }
 
+func TestCaddyPlaceholders(t *testing.T) {
+	hostname, err := os.Hostname()
+	require.NoError(t, err)
+
+	filePlaceholderPath := filepath.Join(t.TempDir(), "header.txt")
+	require.NoError(t, os.WriteFile(filePlaceholderPath, []byte(`X-Test`), 0o644))
+
+	testCases := []struct {
+		name               string
+		headers            http.Header
+		placeholders       []string
+		config             string
+		expectedStatusCode int
+	}{
+		{
+			name:         "GlobalPlaceholder",
+			placeholders: []string{`"global"`},
+			config: fmt.Sprintf(`
+						SecAction "id:100,nolog,phase:1,setvar:tx.hostname={system.hostname}"
+
+						SecRule TX:hostname "@streq %s" "id:101,phase:1,deny,t:none,status:299,chain"`, hostname),
+			expectedStatusCode: 299,
+		},
+		{
+			name:         "RunimePlaceholder",
+			placeholders: []string{`"http.request.header.X-Test"`},
+			config: `
+						SecAction "id:100,nolog,phase:1,setvar:tx.test_header={http.request.header.X-Test}"
+
+						SecRule TX:test_header "@streq test123" "id:101,phase:1,deny,t:none,status:299"`,
+			headers:            http.Header{"X-Test": {"test123"}},
+			expectedStatusCode: 299,
+		},
+		{
+			name:         "MultiByNameFromFile",
+			placeholders: []string{fmt.Sprintf(`"http.request.header.{file.%s}"`, filePlaceholderPath), "global"},
+			config: fmt.Sprintf(`
+						SecAction "id:100,nolog,phase:1,\
+							setvar:tx.hostname={system.hostname},\
+							setvar:tx.test_header={http.request.header.X-Test}"
+
+						SecRule TX:hostname "@streq %s" "id:101,phase:1,deny,t:none,status:299,chain"
+								SecRule TX:test_header "@streq test123" "t:none"`, hostname),
+			headers:            http.Header{"X-Test": {"test123"}},
+			expectedStatusCode: 299,
+		},
+		{
+			name:         "MissedValue",
+			placeholders: []string{`"http.request.header.X-Test"`},
+			config: `
+						SecAction "id:100,nolog,phase:1,setvar:tx.test_header={http.request.header.X-Test}"
+
+						SecRule TX:test_header "@eq 0" "id:101,phase:1,deny,t:none,t:length,status:299"`,
+			expectedStatusCode: 299,
+		},
+		{
+			name:         "NoConflictCurlyBrackets",
+			placeholders: []string{`"global"`},
+			config: `
+						SecRule &TX:critical_anomaly_score "@eq 0" \
+							"id:901140,\
+							phase:1,\
+							pass,\
+							nolog,\
+							tag:'OWASP_CRS',\
+							ver:'OWASP_CRS/4.25.0',\
+							setvar:'tx.critical_anomaly_score=5'"
+
+						SecRule REQUEST_HEADERS:Accept "!@rx ^(?:(?:\*|[^!\"\(\),/:-\?\[-\]\{\}]+)/(?:\*|[^!\"\(\),/:-\?\[-\]\{\}]+)|\*)(?:[\s\x0b]*;[\s\x0b]*(?:charset[\s\x0b]*=[\s\x0b]*\"?(?:iso-8859-15?|utf-8|windows-1252)\b\"?|(?:[^\s\x0b-\"\(\),/:-\?\[-\]c\{\}]|c(?:[^!\"\(\),/:-\?\[-\]h\{\}]|h(?:[^!\"\(\),/:-\?\[-\]a\{\}]|a(?:[^!\"\(\),/:-\?\[-\]r\{\}]|r(?:[^!\"\(\),/:-\?\[-\]s\{\}]|s(?:[^!\"\(\),/:-\?\[-\]e\{\}]|e[^!\"\(\),/:-\?\[-\]t\{\}]))))))[^!\"\(\),/:-\?\[-\]\{\}]*[\s\x0b]*=[\s\x0b]*[^!\(\),/:-\?\[-\]\{\}]+);?)*(?:[\s\x0b]*,[\s\x0b]*(?:(?:\*|[^!\"\(\),/:-\?\[-\]\{\}]+)/(?:\*|[^!\"\(\),/:-\?\[-\]\{\}]+)|\*)(?:[\s\x0b]*;[\s\x0b]*(?:charset[\s\x0b]*=[\s\x0b]*\"?(?:iso-8859-15?|utf-8|windows-1252)\b\"?|(?:[^\s\x0b-\"\(\),/:-\?\[-\]c\{\}]|c(?:[^!\"\(\),/:-\?\[-\]h\{\}]|h(?:[^!\"\(\),/:-\?\[-\]a\{\}]|a(?:[^!\"\(\),/:-\?\[-\]r\{\}]|r(?:[^!\"\(\),/:-\?\[-\]s\{\}]|s(?:[^!\"\(\),/:-\?\[-\]e\{\}]|e[^!\"\(\),/:-\?\[-\]t\{\}]))))))[^!\"\(\),/:-\?\[-\]\{\}]*[\s\x0b]*=[\s\x0b]*[^!\(\),/:-\?\[-\]\{\}]+);?)*)*$" \
+							"id:920600,\
+							phase:1,\
+							block,\
+							t:none,t:lowercase,\
+							msg:'Illegal Accept header: charset parameter',\
+							logdata:'%{MATCHED_VAR}',\
+							tag:'application-multi',\
+							tag:'language-multi',\
+							tag:'platform-multi',\
+							tag:'attack-protocol',\
+							tag:'paranoia-level/1',\
+							tag:'OWASP_CRS',\
+							tag:'OWASP_CRS/PROTOCOL-ENFORCEMENT',\
+							ver:'OWASP_CRS/4.25.0',\
+							severity:'CRITICAL',\
+							setvar:'tx.inbound_anomaly_score_pl1=+%{tx.critical_anomaly_score}'"
+
+						SecRule TX:inbound_anomaly_score_pl1 "@eq 5" "id:100,deny,nolog,phase:1,status:299"`,
+			headers:            http.Header{"Accept": {"text/html;q=0.9;charset=CP1026,*/*;q=0.8"}},
+			expectedStatusCode: 299,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			tester := caddytest.NewTester(t)
+			config := fmt.Sprintf(`{
+				debug
+				admin localhost:%d
+				auto_https off
+				order coraza_waf first
+			}
+
+			:8080 {
+				coraza_waf {
+					expand_caddy_placeholders %s
+					directives <<CORAZA
+						SecRuleEngine On
+
+						%s
+					CORAZA
+				}
+
+				respond 204
+			}`, caddytest.Default.AdminPort, strings.Join(testCase.placeholders, " "), testCase.config)
+			tester.InitServer(config, "caddyfile")
+
+			req, err := http.NewRequest(http.MethodGet, baseURL, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			req.Header = testCase.headers
+
+			tester.AssertResponseCode(req, testCase.expectedStatusCode)
+		})
+	}
+}
+
 // txCloseErrWrapper wraps a real Coraza transaction and overrides Close to
 // return a configurable error. This lets tests verify that ServeHTTP logs a
 // warning when tx.Close() fails, without needing to reach into Coraza internals.
