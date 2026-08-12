@@ -50,6 +50,15 @@ func (i *rwInterceptor) WriteHeader(statusCode int) {
 	}
 
 	i.wroteHeader = true
+
+	// 101 Switching Protocols must reach the client before the connection
+	// is hijacked for bidirectional streaming (e.g. a WebSocket upgrade):
+	// there is no response body to inspect, and keeping the status buffered
+	// would leave the upgrade response unsent once the connection has been
+	// hijacked, so the client would hang waiting for the status line.
+	if statusCode == http.StatusSwitchingProtocols {
+		i.flushWriteHeader()
+	}
 }
 
 // overrideWriteHeader overrides the recorded status code
@@ -132,6 +141,18 @@ func (i *rwInterceptor) Header() http.Header {
 	return i.w.Header()
 }
 
+// Unwrap returns the underlying ResponseWriter so http.ResponseController
+// can reach capabilities implemented deeper in the wrapper chain. Notably,
+// Caddy's own response writer wrappers (installed e.g. when access logging
+// is enabled) do not have a Hijack method at all — they expose hijacking
+// only through Unwrap — so the type assertions in wrap() cannot see it.
+// Without Unwrap here the chain is severed at the interceptor and every
+// WebSocket upgrade fails with "can't switch protocols using non-Hijacker
+// ResponseWriter" (see corazawaf/coraza-caddy#78).
+func (i *rwInterceptor) Unwrap() http.ResponseWriter {
+	return i.w
+}
+
 func (i *rwInterceptor) ReadFrom(r io.Reader) (n int64, err error) {
 	return io.Copy(struct{ io.Writer }{i}, r)
 }
@@ -193,6 +214,10 @@ type responseWriter interface {
 	http.ResponseWriter
 	io.ReaderFrom
 	http.Flusher
+	// Unwrap is part of the http.ResponseController convention; exposing it
+	// through every wrapper combination returned by wrap() keeps the chain
+	// walkable so capabilities like Hijack remain reachable.
+	Unwrap() http.ResponseWriter
 }
 
 var _ responseWriter = (*rwInterceptor)(nil)
