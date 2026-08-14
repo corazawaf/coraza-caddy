@@ -31,3 +31,13 @@ testoverride:
     922130-1: ''
     922130-2: ''
     922130-7: ''
+
+    # Tests sending an X_Filename header: Caddy drops header names containing
+    # underscores (by default), so X_Filename is removed and the upload-detection
+    # rules (933110, 933220, 944140) never see it.
+    933110-3: 'Header name with underscore (X_Filename) is dropped by Caddy, so the rule never fires'
+    933110-13: 'Header name with underscore (X_Filename) is dropped by Caddy, so the rule never fires'
+    933110-14: 'Header name with underscore (X_Filename) is dropped by Caddy, so the rule never fires'
+    933220-2: 'Header name with underscore (X_Filename) is dropped by Caddy, so the rule never fires'
+    944140-3: 'Header name with underscore (X_Filename) is dropped by Caddy, so the rule never fires'
+    944140-8: 'Header name with underscore (X_Filename) is dropped by Caddy, so the rule never fires'
