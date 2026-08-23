@@ -17,3 +17,18 @@ coraza_waf {
 In this scenario, modifying lines in `/path/to/config.conf` will not alter the Caddy configuration itself. Consequently, any added or removed rules will not be recognized by the module.\
 \
 A configuration reload can be enforced by utilizing `caddy reload --force` or, in case you are using APIs, by specifying the `Cache-Control: must-revalidate` header. This forces the reload process regardless of whether any modifications were made. Further details can be found in the official Caddy documentation [here](https://caddyserver.com/docs/api#post-load).
+
+### Memory growth during HTTP/2 HPACK bomb tests
+`coraza-caddy` receives requests only after Caddy has parsed HTTP headers. This means HPACK decompression behavior and memory usage limits are handled at the Caddy HTTP server layer, not inside the Coraza middleware.
+
+If you need to harden against HPACK bomb-style traffic, configure limits on the Caddy server, for example:
+
+```caddy
+{
+	servers {
+		max_header_bytes 16384
+	}
+}
+```
+
+Use a value appropriate for your application. Lower values improve resilience to oversized/expanded headers, but may block legitimate requests with large cookies or header sets.
