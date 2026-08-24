@@ -26,9 +26,11 @@ If you need to harden against HPACK bomb-style traffic, configure limits on the 
 ```caddy
 {
 	servers {
-		max_header_bytes 16384
+		max_header_size 16KiB
 	}
 }
 ```
+
+Note the Caddyfile option is `max_header_size`; `max_header_bytes` is the corresponding key in Caddy's JSON config, and using that name in a Caddyfile is a parse error.
 
 Use a value appropriate for your application. Lower values improve resilience to oversized/expanded headers, but may block legitimate requests with large cookies or header sets.
