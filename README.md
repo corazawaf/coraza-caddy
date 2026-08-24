@@ -94,6 +94,26 @@ go run mage.go test
 
 You can load OWASP CRS by passing the field `load_owasp_crs` and then load the CRS files in the directives as described in the [coraza-coreruleset](https://github.com/corazawaf/coraza-coreruleset) documentation.
 
+The `@`-prefixed paths are **not files on disk**. They are served from a ruleset
+that is compiled into the binary, and `load_owasp_crs` is what makes them
+resolvable. This has two consequences:
+
+- You do not need to download CRS, mount a volume, or ship rule files alongside
+  the binary. `xcaddy build --with github.com/corazawaf/coraza-caddy/v2` already
+  contains them.
+- Do not put a filesystem path in front of an `@` path.
+  `Include /etc/caddy/rules/@owasp_crs/*.conf` will not work; the `@` prefix
+  must start the path.
+
+If you use an `@` path without `load_owasp_crs`, Caddy fails at startup with:
+
+```text
+invalid WAF config from string: failed to readfile:
+  open @coraza.conf-recommended: no such file or directory
+```
+
+Adding `load_owasp_crs` to the `coraza_waf` block resolves it.
+
 ```caddy
 :8080 {
  coraza_waf {
@@ -133,6 +153,33 @@ This is useful when running coraza behind another HTTP server and using the requ
  reverse_proxy httpbin:8081
 }
 ```
+
+
+## Performance
+
+Coraza memoizes the expensive parts of rule compilation (regex and
+aho-corasick pattern compilation) so identical patterns are not recompiled when
+several WAF instances in the same process share the same rules. This matters
+most when one Caddy process serves many sites that each load CRS.
+
+**Memoization is enabled by default.** There is no flag to turn it on. The
+`coraza.no_memoize` build tag exists only to turn it *off*:
+
+| Build tag | Behaviour |
+|---|---|
+| *(none)* | Memoization enabled (default) |
+| `coraza.no_memoize` | Disabled — every pattern compiles fresh |
+
+Older guidance recommends building with `-tags memoize_builders`. That tag was
+how memoization was opted into up to Coraza v3.4.0, when the default was off. It
+was removed in v3.5.0 once memoization became the default. Go ignores unknown
+build tags silently, so passing it today neither fails nor does anything — drop
+it from your build.
+
+The cache is global to the process, so entries are released when a WAF is
+destroyed. This module already does that: the pooled WAF is closed through
+`caddy.Destructor` when the last reference is released, which is what lets
+memory be reclaimed across config reloads.
 
 
 ## Running Example
