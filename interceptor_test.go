@@ -5,8 +5,10 @@ package coraza
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -101,6 +103,24 @@ func TestWriteHeaderSuperfluous(t *testing.T) {
 	// Second call is a no-op
 	i.WriteHeader(http.StatusNotFound)
 	require.Equal(t, http.StatusCreated, i.statusCode)
+}
+
+func TestWriteHeaderSuperfluousDoesNotLog(t *testing.T) {
+	tx := newTestTransaction(t)
+	defer tx.Close()
+
+	rec := httptest.NewRecorder()
+	i := &rwInterceptor{w: rec, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+	var logBuffer bytes.Buffer
+	originalOutput := log.Writer()
+	defer log.SetOutput(originalOutput)
+	log.SetOutput(&logBuffer)
+
+	i.WriteHeader(http.StatusCreated)
+	i.WriteHeader(http.StatusNotFound)
+
+	require.Empty(t, strings.TrimSpace(logBuffer.String()))
 }
 
 func TestWriteTriggersWriteHeader(t *testing.T) {
