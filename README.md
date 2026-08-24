@@ -170,6 +170,12 @@ most when one Caddy process serves many sites that each load CRS.
 | *(none)* | Memoization enabled (default) |
 | `coraza.no_memoize` | Disabled — every pattern compiles fresh |
 
+Older guidance recommends building with `-tags memoize_builders`. That tag was
+how memoization was opted into up to Coraza v3.4.0, when the default was off. It
+was removed in v3.5.0 once memoization became the default. Go ignores unknown
+build tags silently, so passing it today neither fails nor does anything — drop
+it from your build.
+
 The cache is global to the process, so entries are released when a WAF is
 destroyed. This module already does that: the pooled WAF is closed through
 `caddy.Destructor` when the last reference is released, which is what lets
