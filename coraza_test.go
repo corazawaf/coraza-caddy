@@ -670,6 +670,130 @@ func TestResponseBody(t *testing.T) {
 	}
 }
 
+func TestTxIDReqHeader(t *testing.T) {
+	tester := newTester("test2.init.config", t)
+
+	t.Run("uses header value as transaction ID", func(t *testing.T) {
+		req, err := http.NewRequest("GET", baseURL+"/test", nil)
+		if err != nil {
+			t.Fatalf("unable to create request %s", err)
+		}
+
+		// In real use case, this header should be set by a HTTP proxy before coraza, not by a client.
+		txID := "transaction1"
+		req.Header.Add("my-tx-id", txID)
+
+		res, _ := tester.AssertResponse(req, 200, "test123")
+
+		if got, want := res.Header.Get("x-request-id"), txID; got != want {
+			t.Errorf("transaction ID mismatch, got=%v, want=%v", got, want)
+		}
+	})
+
+	t.Run("falls back when header missing", func(t *testing.T) {
+		req, err := http.NewRequest("GET", baseURL+"/test", nil)
+		if err != nil {
+			t.Fatalf("unable to create request %s", err)
+		}
+
+		res, _ := tester.AssertResponse(req, 200, "test123")
+
+		if got := res.Header.Get("x-request-id"); got == "" {
+			t.Errorf("expected a generated request ID, got empty string")
+		}
+	})
+
+	t.Run("falls back when header empty", func(t *testing.T) {
+		req, err := http.NewRequest("GET", baseURL+"/test", nil)
+		if err != nil {
+			t.Fatalf("unable to create request %s", err)
+		}
+		req.Header.Set("my-tx-id", "")
+
+		res, _ := tester.AssertResponse(req, 200, "test123")
+
+		if got := res.Header.Get("x-request-id"); got == "" {
+			t.Errorf("expected a generated request ID, got empty string")
+		}
+	})
+}
+
+// recordingWAF wraps a real Coraza WAF and records the id passed to
+// NewTransactionWithID, so ServeHTTP's transaction ID selection can be asserted
+// without going through the HTTP transport (which rejects CR/LF header values
+// before they ever reach the handler).
+type recordingWAF struct {
+	corazaWAF.WAF
+	lastID string
+}
+
+func (r *recordingWAF) NewTransactionWithID(id string) types.Transaction {
+	r.lastID = id
+	return r.WAF.NewTransactionWithID(id)
+}
+
+// TestServeHTTP_txIDReqHeader exercises the validation boundary of the
+// header-derived transaction ID directly against ServeHTTP: values are trimmed,
+// accepted up to 128 bytes, and rejected (falling back to a generated ID) when
+// they are oversized or contain CR/LF.
+func TestServeHTTP_txIDReqHeader(t *testing.T) {
+	realWAF, err := corazaWAF.NewWAF(corazaWAF.NewWAFConfig().WithDirectives("SecRuleEngine Off"))
+	require.NoError(t, err)
+
+	newModule := func(rec *recordingWAF) corazaModule {
+		return corazaModule{
+			waf:           rec,
+			logger:        zap.NewNop(),
+			TxIDReqHeader: "my-tx-id",
+		}
+	}
+
+	serve := func(m corazaModule, headerValue string) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("my-tx-id", headerValue)
+		w := httptest.NewRecorder()
+		noopHandler := caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error { return nil })
+		require.NoError(t, m.ServeHTTP(w, req, noopHandler))
+	}
+
+	t.Run("trims whitespace from header value", func(t *testing.T) {
+		rec := &recordingWAF{WAF: realWAF}
+		m := newModule(rec)
+
+		serve(m, "  transaction2  ")
+
+		require.Equal(t, "transaction2", rec.lastID)
+	})
+
+	t.Run("accepts 128-byte header value", func(t *testing.T) {
+		rec := &recordingWAF{WAF: realWAF}
+		m := newModule(rec)
+
+		txID := strings.Repeat("a", 128)
+		serve(m, txID)
+
+		require.Equal(t, txID, rec.lastID)
+	})
+
+	t.Run("falls back for 129-byte header value", func(t *testing.T) {
+		rec := &recordingWAF{WAF: realWAF}
+		m := newModule(rec)
+
+		serve(m, strings.Repeat("b", 129))
+
+		require.Equal(t, 16, len(rec.lastID))
+	})
+
+	t.Run("falls back for header value with CR/LF", func(t *testing.T) {
+		rec := &recordingWAF{WAF: realWAF}
+		m := newModule(rec)
+
+		serve(m, "foo\r\nbar")
+
+		require.Equal(t, 16, len(rec.lastID))
+	})
+}
+
 // txCloseErrWrapper wraps a real Coraza transaction and overrides Close to
 // return a configurable error. This lets tests verify that ServeHTTP logs a
 // warning when tx.Close() fails, without needing to reach into Coraza internals.
@@ -732,6 +856,44 @@ func TestServeHTTP_txCloseErrorIsLogged(t *testing.T) {
 	require.Equal(t, "Failed to close the transaction", entry.Message)
 	require.NotEmpty(t, entry.ContextMap()["tx_id"], "tx_id field must be present")
 	require.Equal(t, closeErr.Error(), entry.ContextMap()["error"], "error field must match")
+}
+
+// TestIsValidTxID pins the accept/reject set for proxy-supplied transaction
+// IDs. Coraza's concurrent audit log writer builds a file path from the
+// transaction ID, so path separators and traversal sequences must never be
+// accepted from a request header.
+func TestIsValidTxID(t *testing.T) {
+	valid := []string{
+		"transaction1",
+		"01JQ8Z4M9K2P3R5T7V9X",
+		"req-id_2026.08.24",
+		strings.Repeat("a", 128),
+	}
+	for _, s := range valid {
+		require.True(t, isValidTxID(s), "expected %q to be accepted", s)
+	}
+
+	invalid := []struct {
+		name string
+		in   string
+	}{
+		{"empty", ""},
+		{"too long", strings.Repeat("a", 129)},
+		{"CR", "abc\rdef"},
+		{"LF", "abc\ndef"},
+		{"forward slash", "abc/def"},
+		{"backslash", `abc\def`},
+		{"traversal", "../../../../tmp/pwned"},
+		{"encoded traversal", "..%2f..%2ftmp"},
+		{"null byte", "abc\x00def"},
+		{"space", "abc def"},
+		{"percent", "abc%2fdef"},
+	}
+	for _, tc := range invalid {
+		t.Run(tc.name, func(t *testing.T) {
+			require.False(t, isValidTxID(tc.in), "expected %q to be rejected", tc.in)
+		})
+	}
 }
 
 // TestViolationLogClientIPFromXFF verifies that the "WAF rule violation

@@ -110,6 +110,31 @@ You can load OWASP CRS by passing the field `load_owasp_crs` and then load the C
 }
 ```
 
+## Specifying transaction ID from downstream
+
+You can specify the transaction ID by setting the field `tx_id_req_header` and then pass the value for that request header.
+This is useful when running coraza behind another HTTP server and using the request ID issued by that server.
+
+**Important:** `tx_id_req_header` must be set or overwritten only by a trusted upstream proxy, and that proxy must strip any client-provided value for the same header before it reaches coraza. Otherwise, clients can spoof the transaction ID (and any downstream consumers of it). Configure your front-end proxy to remove client-sent values and inject a trusted request ID instead.
+
+```caddy
+:8080 {
+ coraza_waf {
+  load_owasp_crs
+  directives `
+   Include @coraza.conf-recommended
+   Include @crs-setup.conf.example
+   Include @owasp_crs/*.conf
+   SecRuleEngine On
+  `
+  tx_id_req_header "X-Transaction-ID"
+ }
+
+ reverse_proxy httpbin:8081
+}
+```
+
+
 ## Running Example
 
 ### Docker
