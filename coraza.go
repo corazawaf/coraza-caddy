@@ -57,10 +57,11 @@ func (p *pooledWAF) Destruct() error {
 // corazaModule is a Web Application Firewall implementation for Caddy.
 type corazaModule struct {
 	// deprecated
-	Include       []string `json:"include"`
-	Directives    string   `json:"directives"`
-	LoadOWASPCRS  bool     `json:"load_owasp_crs"`
-	TxIDReqHeader string   `json:"tx_id_req_header"`
+	Include []string `json:"include"`
+
+	Directives    string `json:"directives"`
+	LoadOWASPCRS  bool   `json:"load_owasp_crs"`
+	TxIDReqHeader string `json:"tx_id_req_header"`
 
 	logger  *zap.Logger
 	waf     coraza.WAF
@@ -171,13 +172,32 @@ func (m *corazaModule) Cleanup() error {
 
 var errInterruptionTriggered = errors.New("interruption triggered")
 
+// isValidTxID reports whether s is acceptable as a transaction ID supplied by
+// an upstream proxy. Coraza's concurrent audit log writer interpolates the
+// transaction ID into a file path, so anything outside a conservative
+// alphanumeric set is rejected to keep a spoofed header from escaping the
+// audit log directory or forging log lines.
+func isValidTxID(s string) bool {
+	if s == "" || len(s) > 128 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
+		case c == '-', c == '_', c == '.':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // ServeHTTP implements caddyhttp.MiddlewareHandler.
 func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyhttp.Handler) error {
 	id := randomString(16)
 	if header := strings.TrimSpace(m.TxIDReqHeader); header != "" {
-		if candidate := strings.TrimSpace(r.Header.Get(header)); candidate != "" &&
-			len(candidate) <= 128 &&
-			!strings.ContainsAny(candidate, "\r\n") {
+		if candidate := strings.TrimSpace(r.Header.Get(header)); isValidTxID(candidate) {
 			id = candidate
 		}
 	}

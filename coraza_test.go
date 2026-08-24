@@ -855,3 +855,41 @@ func TestServeHTTP_txCloseErrorIsLogged(t *testing.T) {
 	require.NotEmpty(t, entry.ContextMap()["tx_id"], "tx_id field must be present")
 	require.Equal(t, closeErr.Error(), entry.ContextMap()["error"], "error field must match")
 }
+
+// TestIsValidTxID pins the accept/reject set for proxy-supplied transaction
+// IDs. Coraza's concurrent audit log writer builds a file path from the
+// transaction ID, so path separators and traversal sequences must never be
+// accepted from a request header.
+func TestIsValidTxID(t *testing.T) {
+	valid := []string{
+		"transaction1",
+		"01JQ8Z4M9K2P3R5T7V9X",
+		"req-id_2026.08.24",
+		strings.Repeat("a", 128),
+	}
+	for _, s := range valid {
+		require.True(t, isValidTxID(s), "expected %q to be accepted", s)
+	}
+
+	invalid := []struct {
+		name string
+		in   string
+	}{
+		{"empty", ""},
+		{"too long", strings.Repeat("a", 129)},
+		{"CR", "abc\rdef"},
+		{"LF", "abc\ndef"},
+		{"forward slash", "abc/def"},
+		{"backslash", `abc\def`},
+		{"traversal", "../../../../tmp/pwned"},
+		{"encoded traversal", "..%2f..%2ftmp"},
+		{"null byte", "abc\x00def"},
+		{"space", "abc def"},
+		{"percent", "abc%2fdef"},
+	}
+	for _, tc := range invalid {
+		t.Run(tc.name, func(t *testing.T) {
+			require.False(t, isValidTxID(tc.in), "expected %q to be rejected", tc.in)
+		})
+	}
+}
