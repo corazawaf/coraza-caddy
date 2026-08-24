@@ -38,7 +38,7 @@ Use a value appropriate for your application. Lower values improve resilience to
 ### `open @coraza.conf-recommended: no such file or directory`
 The `@`-prefixed CRS paths are served from a ruleset compiled into the binary, not read from disk, and the `load_owasp_crs` field is what makes them resolvable. Without it Caddy treats `@coraza.conf-recommended` as a literal filename and fails at startup:
 
-```
+```text
 invalid WAF config from string: failed to readfile:
   open @coraza.conf-recommended: no such file or directory
 ```

@@ -107,7 +107,7 @@ resolvable. This has two consequences:
 
 If you use an `@` path without `load_owasp_crs`, Caddy fails at startup with:
 
-```
+```text
 invalid WAF config from string: failed to readfile:
   open @coraza.conf-recommended: no such file or directory
 ```
