@@ -731,3 +731,71 @@ func TestServeHTTP_txCloseErrorIsLogged(t *testing.T) {
 	require.NotEmpty(t, entry.ContextMap()["tx_id"], "tx_id field must be present")
 	require.Equal(t, closeErr.Error(), entry.ContextMap()["error"], "error field must match")
 }
+
+func TestWAFViolationLogClientIP(t *testing.T) {
+	waf, err := corazaWAF.NewWAF(
+		corazaWAF.NewWAFConfig().
+			WithDirectives(`
+				SecRuleEngine On
+				SecRule REQUEST_URI "/block" "id:1,phase:1,deny"
+			`),
+	)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name             string
+		remoteAddr       string
+		clientIPVar      string
+		expectedClientIP string
+	}{
+		{
+			name:             "from RemoteAddr",
+			remoteAddr:       "1.2.3.4:1234",
+			expectedClientIP: "1.2.3.4",
+		},
+		{
+			name:             "from Caddy variable",
+			remoteAddr:       "127.0.0.1:1234",
+			clientIPVar:      "5.6.7.8:5678",
+			expectedClientIP: "5.6.7.8",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			core, logs := observer.New(zapcore.ErrorLevel)
+			m := corazaModule{
+				waf:    waf,
+				logger: zap.New(core),
+			}
+
+			req := httptest.NewRequest("GET", "/block", nil)
+			req.RemoteAddr = tt.remoteAddr
+
+			ctx := req.Context()
+			ctx = context.WithValue(ctx, caddyhttp.VarsCtxKey, make(map[string]any))
+			// We need a Replacer in the context because ServeHTTP uses it
+			repl := caddy.NewReplacer()
+			ctx = context.WithValue(ctx, caddy.ReplacerCtxKey, repl)
+			// We also need a Server in the context because PrepareRequest uses it
+			server := &caddyhttp.Server{}
+			ctx = context.WithValue(ctx, caddyhttp.ServerCtxKey, server)
+
+			req = req.WithContext(ctx)
+
+			if tt.clientIPVar != "" {
+				caddyhttp.SetVar(req.Context(), caddyhttp.ClientIPVarKey, tt.clientIPVar)
+			}
+
+			w := httptest.NewRecorder()
+			noopHandler := caddyhttp.HandlerFunc(func(w http.ResponseWriter, r *http.Request) error { return nil })
+
+			_ = m.ServeHTTP(w, req, noopHandler)
+
+			require.Equal(t, 1, logs.Len(), "expected exactly one error log")
+			entry := logs.All()[0]
+			require.Equal(t, "WAF rule violation detected", entry.Message)
+			require.Equal(t, tt.expectedClientIP, entry.ContextMap()["client_ip"])
+		})
+	}
+}
