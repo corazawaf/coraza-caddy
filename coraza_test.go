@@ -6,6 +6,7 @@ package coraza
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -892,4 +894,78 @@ func TestIsValidTxID(t *testing.T) {
 			require.False(t, isValidTxID(tc.in), "expected %q to be rejected", tc.in)
 		})
 	}
+}
+
+// TestViolationLogClientIPFromXFF verifies that the "WAF rule violation
+// detected" error log carries the client IP resolved by PrepareRequest
+// (trusted proxy + X-Forwarded-For), not r.RemoteAddr. Regression test for
+// the client_ip fix: before it, the log field reported the proxy's address.
+func TestViolationLogClientIPFromXFF(t *testing.T) {
+	findFreePort := func(t *testing.T) int {
+		t.Helper()
+		ln, err := net.Listen("tcp", ":0")
+		require.NoError(t, err)
+		addr := ln.Addr().String()
+		ln.Close()
+		_, portStr, _ := net.SplitHostPort(addr)
+		port, _ := strconv.Atoi(portStr)
+		return port
+	}
+
+	logFile := filepath.Join(t.TempDir(), "caddy.log")
+	caddyPort := findFreePort(t)
+	caddyAdminPort := caddytest.Default.AdminPort
+
+	tester := caddytest.NewTester(t)
+	config := fmt.Sprintf(`{
+		admin localhost:%d
+		auto_https off
+		order coraza_waf first
+		log {
+			output file %s
+			format json
+			level DEBUG
+		}
+		servers {
+			trusted_proxies static private_ranges
+		}
+	}
+
+	:%d {
+		coraza_waf {
+			directives `+"`"+`SecRuleEngine On
+			SecRule REQUEST_URI "@streq /denyme" "id:9306,phase:1,deny,status:403,log,msg:'client_ip log test'"`+"`"+`
+		}
+		respond "ok"
+	}`, caddyAdminPort, logFile, caddyPort)
+
+	tester.InitServer(config, "caddyfile")
+
+	const forwardedIP = "203.0.113.7"
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://127.0.0.1:%d/denyme", caddyPort), nil)
+	require.NoError(t, err)
+	req.Header.Set("X-Forwarded-For", forwardedIP)
+	tester.AssertResponseCode(req, 403)
+
+	// The log write is asynchronous; poll for the violation entry.
+	var entry map[string]any
+	require.Eventually(t, func() bool {
+		data, err := os.ReadFile(logFile)
+		if err != nil {
+			return false
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if !strings.Contains(line, "WAF rule violation detected") {
+				continue
+			}
+			if err := json.Unmarshal([]byte(line), &entry); err == nil {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 100*time.Millisecond, "violation log entry not found")
+
+	require.Equal(t, forwardedIP, entry["client_ip"],
+		"violation log must carry the XFF-resolved client IP, not the proxy RemoteAddr")
+	require.Equal(t, "/denyme", entry["uri"])
 }
