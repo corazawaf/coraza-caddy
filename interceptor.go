@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 
@@ -51,7 +50,6 @@ type rwInterceptor struct {
 // the body is being written.
 func (i *rwInterceptor) WriteHeader(statusCode int) {
 	if i.wroteHeader {
-		log.Println("http: superfluous response.WriteHeader call")
 		return
 	}
 
