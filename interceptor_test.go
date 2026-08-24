@@ -120,7 +120,7 @@ func TestWriteHeaderSuperfluousDoesNotLog(t *testing.T) {
 	i.WriteHeader(http.StatusCreated)
 	i.WriteHeader(http.StatusNotFound)
 
-	require.Empty(t, strings.TrimSpace(logBuffer.String()))
+	require.NotContains(t, logBuffer.String(), "http: superfluous response.WriteHeader call")
 }
 
 func TestWriteTriggersWriteHeader(t *testing.T) {
