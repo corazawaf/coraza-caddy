@@ -1,17 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    ":dependencyDashboard",
-    ":semanticPrefixFixDepsChoreOthers",
-    ":ignoreModulesAndTests",
-    "group:monorepos",
-    "group:recommended",
-    "replacements:all",
-    "workarounds:all"
+    "github>corazawaf/renovate-config"
   ],
-  "constraints": {
-    "go": "1.23"
-  },
   "postUpdateOptions": [
     "gomodTidy"
   ]
