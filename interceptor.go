@@ -273,7 +273,7 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 				return caddyhttp.HandlerError{
 					ID:         tx.ID(),
 					StatusCode: code,
-					Err:        errInterruptionTriggered,
+					Err:        newInterruptionError(it),
 				}
 			}
 

@@ -172,6 +172,32 @@ func (m *corazaModule) Cleanup() error {
 
 var errInterruptionTriggered = errors.New("interruption triggered")
 
+// interruptionError reports which rule interrupted the transaction. It reaches
+// operators through Caddy's {http.err.message} placeholder, where a constant
+// string gives no way to tell one block from another.
+//
+// The message keeps "interruption triggered" as its prefix, and the error still
+// matches errInterruptionTriggered under errors.Is, so existing checks against
+// either keep working.
+type interruptionError struct {
+	ruleID int
+	action string
+}
+
+func (e *interruptionError) Error() string {
+	return fmt.Sprintf("%s by rule %d (action %s)", errInterruptionTriggered, e.ruleID, e.action)
+}
+
+func (e *interruptionError) Unwrap() error { return errInterruptionTriggered }
+
+// newInterruptionError builds the error returned to Caddy for an interruption.
+func newInterruptionError(it *types.Interruption) error {
+	if it == nil {
+		return errInterruptionTriggered
+	}
+	return &interruptionError{ruleID: it.RuleID, action: it.Action}
+}
+
 // isValidTxID reports whether s is acceptable as a transaction ID supplied by
 // an upstream proxy. Coraza's concurrent audit log writer interpolates the
 // transaction ID into a file path, so anything outside a conservative
@@ -243,7 +269,7 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 		return caddyhttp.HandlerError{
 			StatusCode: obtainStatusCodeFromInterruptionOrDefault(it, http.StatusOK),
 			ID:         tx.ID(),
-			Err:        errInterruptionTriggered,
+			Err:        newInterruptionError(it),
 		}
 	}
 

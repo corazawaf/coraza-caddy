@@ -969,3 +969,98 @@ func TestViolationLogClientIPFromXFF(t *testing.T) {
 		"violation log must carry the XFF-resolved client IP, not the proxy RemoteAddr")
 	require.Equal(t, "/denyme", entry["uri"])
 }
+
+// TestInterruptionErrorCarriesRuleDetail checks that the error handed to Caddy
+// names the rule that blocked the request, so {http.err.message} can
+// distinguish one block from another instead of always reading
+// "interruption triggered" (issue #162).
+func TestInterruptionErrorCarriesRuleDetail(t *testing.T) {
+	t.Run("request phase", func(t *testing.T) {
+		waf, err := corazaWAF.NewWAF(
+			corazaWAF.NewWAFConfig().WithDirectives(
+				`SecRuleEngine On
+				SecRule REQUEST_URI "@streq /blocked" "id:4242,phase:1,deny,status:403"`),
+		)
+		require.NoError(t, err)
+
+		m := corazaModule{waf: waf, logger: zap.NewNop()}
+		req := httptest.NewRequest(http.MethodGet, "/blocked", nil)
+		req.RemoteAddr = "127.0.0.1:12345"
+		ctx := context.WithValue(req.Context(), caddy.ReplacerCtxKey, caddy.NewReplacer())
+		ctx = context.WithValue(ctx, caddyhttp.VarsCtxKey, map[string]any{})
+		ctx = context.WithValue(ctx, caddyhttp.ServerCtxKey, &caddyhttp.Server{})
+		req = req.WithContext(ctx)
+
+		err = m.ServeHTTP(httptest.NewRecorder(), req,
+			caddyhttp.HandlerFunc(func(http.ResponseWriter, *http.Request) error { return nil }))
+		require.Error(t, err)
+
+		var handlerErr caddyhttp.HandlerError
+		require.ErrorAs(t, err, &handlerErr)
+		require.Equal(t, http.StatusForbidden, handlerErr.StatusCode)
+
+		msg := handlerErr.Err.Error()
+		require.Contains(t, msg, "4242", "message must name the rule that blocked: %q", msg)
+		require.Contains(t, msg, "deny", "message must name the action: %q", msg)
+		require.True(t, strings.HasPrefix(msg, "interruption triggered"),
+			"prefix must stay stable for existing string matches: %q", msg)
+		require.ErrorIs(t, handlerErr.Err, errInterruptionTriggered,
+			"errors.Is against the sentinel must keep working")
+	})
+
+	t.Run("nil interruption falls back to the sentinel", func(t *testing.T) {
+		require.Equal(t, errInterruptionTriggered, newInterruptionError(nil))
+	})
+
+	t.Run("message format", func(t *testing.T) {
+		err := newInterruptionError(&types.Interruption{RuleID: 949110, Action: "deny"})
+		require.Equal(t, "interruption triggered by rule 949110 (action deny)", err.Error())
+	})
+}
+
+// TestInterruptionDetailReachesErrorPlaceholder is the end-to-end form of
+// issue #162: an operator using handle_errors should be able to tell which
+// rule blocked the request, not just that something did.
+func TestInterruptionDetailReachesErrorPlaceholder(t *testing.T) {
+	findFreePort := func(t *testing.T) int {
+		t.Helper()
+		ln, err := net.Listen("tcp", ":0")
+		require.NoError(t, err)
+		addr := ln.Addr().String()
+		ln.Close()
+		_, portStr, _ := net.SplitHostPort(addr)
+		port, _ := strconv.Atoi(portStr)
+		return port
+	}
+
+	caddyPort := findFreePort(t)
+	tester := caddytest.NewTester(t)
+	tester.InitServer(fmt.Sprintf(`{
+		admin localhost:%d
+		auto_https off
+		order coraza_waf first
+	}
+
+	:%d {
+		coraza_waf {
+			directives `+"`"+`SecRuleEngine On
+			SecRule REQUEST_URI "@streq /blocked" "id:4242,phase:1,deny,status:403"`+"`"+`
+		}
+		respond "ok"
+
+		handle_errors {
+			respond "{http.error.message}" {http.error.status_code}
+		}
+	}`, caddytest.Default.AdminPort, caddyPort), "caddyfile")
+
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://127.0.0.1:%d/blocked", caddyPort), nil)
+	require.NoError(t, err)
+	resp := tester.AssertResponseCode(req, 403)
+	require.Equal(t, 403, resp.StatusCode)
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	body := string(raw)
+	require.Contains(t, body, "4242", "operator must be able to see the blocking rule, got %q", body)
+	require.Contains(t, body, "deny", "operator must be able to see the action, got %q", body)
+}

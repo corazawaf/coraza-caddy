@@ -227,4 +227,33 @@ handle_errors {
 }
 ```
 
-It is possible to use the [templates](https://caddyserver.com/docs/caddyfile/directives/templates) directive to render data dynamically. Take a look at [`example/403.html`](./example/403.html) file.  
+It is possible to use the [templates](https://caddyserver.com/docs/caddyfile/directives/templates) directive to render data dynamically. Take a look at [`example/403.html`](./example/403.html) file.
+
+### Identifying which rule blocked a request
+
+Caddy exposes the handler error through `{http.error.message}`, which for a WAF
+interruption names the rule and the action that caused it:
+
+```caddy
+handle_errors 403 {
+	respond "{http.error.message}"
+}
+```
+
+```text
+interruption triggered by rule 949110 (action deny)
+```
+
+`{http.error.id}` carries the Coraza transaction ID for the same request, which
+is the field to correlate against the audit log:
+
+```caddy
+handle_errors 403 {
+	respond "Blocked: {http.error.message} (transaction {http.error.id})"
+}
+```
+
+Rule IDs are only as exposed as you choose to make them. Echoing
+`{http.error.message}` straight back to the client tells an attacker which rule
+they tripped; logging it server-side and returning a generic page does not.
+  
