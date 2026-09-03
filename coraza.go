@@ -203,6 +203,13 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	}
 
 	tx := m.waf.NewTransactionWithID(id)
+	// dotCMS patch: populate the transaction server name so every matched-rule
+	// audit line carries [hostname "<request host>"]. Upstream leaves it empty
+	// (the interceptor never sets it), which makes multi-site deployments
+	// unable to tell which host a warning belongs to. Set BEFORE
+	// ProcessRequestHeaders (see types.Transaction.SetServerName docs) —
+	// processRequest below calls it.
+	tx.SetServerName(r.Host)
 	defer func() {
 		tx.ProcessLogging()
 		if err := tx.Close(); err != nil {
