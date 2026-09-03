@@ -65,6 +65,12 @@ type txMeta struct {
 	cnameTarget string
 }
 
+// Registry is package-level on purpose: WAF instances are pooled by config and
+// shared across module instances, so the matched-rule callback (bound to the
+// pooled instance) must resolve metadata stored by whichever module instance
+// served the request. Transaction ids are globally unique.
+var txMetaRegistry sync.Map
+
 type corazaModule struct {
 	// dotCMS: tx id -> *txMeta; populated per request, cleaned on close.
 	txMeta *sync.Map
@@ -91,7 +97,6 @@ func (corazaModule) CaddyModule() caddy.ModuleInfo {
 // Provision implements caddy.Provisioner.
 func (m *corazaModule) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger(m)
-	m.txMeta = &sync.Map{}
 	m.poolKey = m.computePoolKey()
 
 	val, loaded, err := wafPool.LoadOrNew(m.poolKey, func() (caddy.Destructor, error) {
@@ -226,14 +231,13 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	// target from the cname_router_resolve stage's vars) for the matched-rule
 	// callback — upstream's ErrorLog writes the unset server IP into the
 	// [hostname] slot, losing the host entirely.
-	// (txMeta is nil in unprovisioned module literals — skip attribution.)
-	if m.txMeta != nil {
+	{
 		meta := &txMeta{host: r.Host, uri: r.RequestURI}
 		if v, ok := caddyhttp.GetVar(r.Context(), "cname_target").(string); ok && v != "" {
 			meta.cnameTarget = v
 		}
-		m.txMeta.Store(id, meta)
-		defer m.txMeta.Delete(id)
+		txMetaRegistry.Store(id, meta)
+		defer txMetaRegistry.Delete(id)
 	}
 	tx.SetServerName(r.Host)
 	defer func() {
@@ -354,7 +358,7 @@ func (m *corazaModule) newErrorCb() func(types.MatchedRule) {
 	return func(mr types.MatchedRule) {
 		logMsg := mr.ErrorLog()
 		var fields []zap.Field
-		if meta, ok := m.txMeta.Load(mr.TransactionID()); ok {
+		if meta, ok := txMetaRegistry.Load(mr.TransactionID()); ok {
 			if tm, ok := meta.(*txMeta); ok {
 				fields = append(fields,
 					zap.String("host", tm.host),
