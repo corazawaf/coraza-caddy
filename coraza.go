@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
@@ -55,7 +56,18 @@ func (p *pooledWAF) Destruct() error {
 }
 
 // corazaModule is a Web Application Firewall implementation for Caddy.
+// txMeta carries per-request attribution for matched-rule logging: upstream
+// ErrorLog writes the (unset) server IP into the [hostname] slot, so the host,
+// URI and resolved CNAME target are attached as structured zap fields instead.
+type txMeta struct {
+	host        string
+	uri         string
+	cnameTarget string
+}
+
 type corazaModule struct {
+	// dotCMS: tx id -> *txMeta; populated per request, cleaned on close.
+	txMeta *sync.Map
 	// deprecated
 	Include []string `json:"include"`
 
@@ -79,6 +91,7 @@ func (corazaModule) CaddyModule() caddy.ModuleInfo {
 // Provision implements caddy.Provisioner.
 func (m *corazaModule) Provision(ctx caddy.Context) error {
 	m.logger = ctx.Logger(m)
+	m.txMeta = &sync.Map{}
 	m.poolKey = m.computePoolKey()
 
 	val, loaded, err := wafPool.LoadOrNew(m.poolKey, func() (caddy.Destructor, error) {
@@ -102,7 +115,7 @@ func (m *corazaModule) Provision(ctx caddy.Context) error {
 // buildWAF creates a new coraza.WAF from the module's configuration.
 func (m *corazaModule) buildWAF() (coraza.WAF, error) {
 	config := coraza.NewWAFConfig().
-		WithErrorCallback(newErrorCb(m.logger)).
+		WithErrorCallback(m.newErrorCb()).
 		WithDebugLogger(newLogger(m.logger))
 
 	if m.LoadOWASPCRS {
@@ -209,6 +222,19 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	// unable to tell which host a warning belongs to. Set BEFORE
 	// ProcessRequestHeaders (see types.Transaction.SetServerName docs) —
 	// processRequest below calls it.
+	// dotCMS: stash per-transaction attribution (host, URI, resolved CNAME
+	// target from the cname_router_resolve stage's vars) for the matched-rule
+	// callback — upstream's ErrorLog writes the unset server IP into the
+	// [hostname] slot, losing the host entirely.
+	// (txMeta is nil in unprovisioned module literals — skip attribution.)
+	if m.txMeta != nil {
+		meta := &txMeta{host: r.Host, uri: r.RequestURI}
+		if v, ok := caddyhttp.GetVar(r.Context(), "cname_target").(string); ok && v != "" {
+			meta.cnameTarget = v
+		}
+		m.txMeta.Store(id, meta)
+		defer m.txMeta.Delete(id)
+	}
 	tx.SetServerName(r.Host)
 	defer func() {
 		tx.ProcessLogging()
@@ -324,25 +350,34 @@ func parseCaddyfile(h httpcaddyfile.Helper) (caddyhttp.MiddlewareHandler, error)
 	return m, err
 }
 
-func newErrorCb(logger *zap.Logger) func(types.MatchedRule) {
+func (m *corazaModule) newErrorCb() func(types.MatchedRule) {
 	return func(mr types.MatchedRule) {
 		logMsg := mr.ErrorLog()
+		var fields []zap.Field
+		if meta, ok := m.txMeta.Load(mr.TransactionID()); ok {
+			if tm, ok := meta.(*txMeta); ok {
+				fields = append(fields,
+					zap.String("host", tm.host),
+					zap.String("uri", tm.uri),
+					zap.String("cname_target", tm.cnameTarget))
+			}
+		}
 		switch mr.Rule().Severity() {
 		case types.RuleSeverityEmergency,
 			types.RuleSeverityAlert,
 			types.RuleSeverityCritical,
 			types.RuleSeverityError:
-			logger.Error(logMsg)
+			m.logger.Error(logMsg, fields...)
 		case types.RuleSeverityWarning:
-			logger.Warn(logMsg)
+			m.logger.Warn(logMsg, fields...)
 		case types.RuleSeverityNotice:
-			logger.Info(logMsg)
+			m.logger.Info(logMsg, fields...)
 		case types.RuleSeverityInfo:
-			logger.Info(logMsg)
+			m.logger.Info(logMsg, fields...)
 		case types.RuleSeverityDebug:
-			logger.Debug(logMsg)
+			m.logger.Debug(logMsg, fields...)
 		default:
-			logger.Warn(logMsg)
+			m.logger.Warn(logMsg, fields...)
 		}
 	}
 }
