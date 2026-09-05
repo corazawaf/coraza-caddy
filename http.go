@@ -19,8 +19,8 @@ func processRequest(tx types.Transaction, req *http.Request) (*types.Interruptio
 	client, cport := getClientAddress(req)
 
 	var in *types.Interruption
-	// There is no socket access in the request object, so we neither know the server client nor port.
-	tx.ProcessConnection(client, cport, "", 0)
+	// There is no socket access in the request object, so we don't know the actual server port.
+	tx.ProcessConnection(client, cport, parseServerName(req.Host), 0)
 	tx.ProcessURI(req.URL.String(), req.Method, req.Proto)
 	for k, vr := range req.Header {
 		for _, v := range vr {
