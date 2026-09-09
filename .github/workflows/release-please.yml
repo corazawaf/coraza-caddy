@@ -28,10 +28,10 @@ jobs:
 
     steps:
       # GITHUB_TOKEN-authored pushes never trigger other workflows, so a tag
-      # created with it would not fire a future tag-triggered goreleaser
-      # workflow. RELEASE_PLEASE_CLIENT_ID/_APP_PRIVATE_KEY are a dedicated
-      # GitHub App installed on corazawaf with contents/pull-requests/issues
-      # write, scoped to this use.
+      # or release created with it would not fire any future tag/release-
+      # triggered workflow. RELEASE_PLEASE_CLIENT_ID/_APP_PRIVATE_KEY are a
+      # dedicated GitHub App installed on corazawaf with contents/pull-requests/
+      # issues write, scoped to this use.
       # Skipped for dry-run: the preview below never uses it.
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # ratchet:actions/create-github-app-token@v3.2.0
         id: app-token
