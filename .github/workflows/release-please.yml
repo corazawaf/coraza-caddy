@@ -1,0 +1,76 @@
+name: release-please
+
+# default token permissions: none
+permissions: {}
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Dry run — preview the release PR without creating or modifying anything"
+        type: boolean
+        default: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    # The real release path's writes (PR, changelog commit, tag) go through
+    # the separately-scoped App token below, not this job's GITHUB_TOKEN --
+    # the only thing GITHUB_TOKEN is used for here is the read-only dry-run
+    # preview, so it needs no write access.
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+
+    steps:
+      # GITHUB_TOKEN-authored pushes never trigger other workflows, so a tag
+      # created with it would not fire a future tag-triggered goreleaser
+      # workflow. RELEASE_PLEASE_CLIENT_ID/_APP_PRIVATE_KEY are a dedicated
+      # GitHub App installed on corazawaf with contents/pull-requests/issues
+      # write, scoped to this use.
+      # Skipped for dry-run: the preview below never uses it.
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # ratchet:actions/create-github-app-token@v3.2.0
+        id: app-token
+        if: inputs.dry-run != true
+        with:
+          client-id: ${{ secrets.RELEASE_PLEASE_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_PLEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # ratchet:googleapis/release-please-action@v5.0.0
+        if: inputs.dry-run != true
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          config-file: .github/release-please-config.json
+          manifest-file: .github/.release-please-manifest.json
+
+      # A real preview: the release-please CLI's --dry-run reports what would
+      # happen via read-only GitHub API calls, no PR or tag is ever created,
+      # so it runs on the default GITHUB_TOKEN instead of the write-scoped App
+      # token above.
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # ratchet:actions/setup-node@v6.0.0
+        if: inputs.dry-run == true
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Preview release PR
+        if: inputs.dry-run == true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO_URL: ${{ github.repository }}
+        run: |
+          # Pinned to the exact release-please version googleapis/release-please-action@v5.0.0
+          # bundles, so the preview matches what the real run above would compute.
+          npx --yes release-please@17.6.0 release-pr \
+            --token="${GITHUB_TOKEN}" \
+            --repo-url="${REPO_URL}" \
+            --config-file=.github/release-please-config.json \
+            --manifest-file=.github/.release-please-manifest.json \
+            --dry-run
