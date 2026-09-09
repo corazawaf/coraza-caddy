@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -462,7 +463,7 @@ func TestNewErrorCb(t *testing.T) {
 
 			waf, err := corazaWAF.NewWAF(
 				corazaWAF.NewWAFConfig().
-					WithErrorCallback(newErrorCb(zap.New(core))).
+					WithErrorCallback((&corazaModule{logger: zap.New(core), txMeta: &sync.Map{}}).newErrorCb()).
 					WithDirectives(fmt.Sprintf(
 						`SecRuleEngine On
 						SecRule REQUEST_URI "/trigger" "id:1,phase:1,pass,log,severity:%d"`,
@@ -489,7 +490,7 @@ func TestNewErrorCb(t *testing.T) {
 
 		waf, err := corazaWAF.NewWAF(
 			corazaWAF.NewWAFConfig().
-				WithErrorCallback(newErrorCb(zap.New(core))).
+				WithErrorCallback((&corazaModule{logger: zap.New(core), txMeta: &sync.Map{}}).newErrorCb()).
 				WithDirectives(
 					`SecRuleEngine On
 					SecRule REQUEST_URI "/trigger" "id:1,phase:1,pass,log"`,
