@@ -31,6 +31,22 @@ func (h *hijackerTracker) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return conn, rw, nil
 }
 
+// hijackerOf returns the http.Hijacker reachable from w, unwrapping response
+// writers that only expose it further down the chain, as caddy's
+// ResponseWriterWrapper does.
+func hijackerOf(w http.ResponseWriter) (http.Hijacker, bool) {
+	for {
+		if h, ok := w.(http.Hijacker); ok {
+			return h, true
+		}
+		u, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return nil, false
+		}
+		w = u.Unwrap()
+	}
+}
+
 // Copied from https://github.com/corazawaf/coraza/blob/main/http/interceptor.go
 // rwInterceptor intercepts the ResponseWriter, so it can track response size
 // and returned status code.
@@ -175,10 +191,12 @@ func (i *rwInterceptor) Flush() {
 
 	if i.allowFlushing {
 		if i.isWriteHeaderFlush {
-			// only propagate flush if the headers have been flushed already
-			if fl, ok := i.w.(http.Flusher); ok {
-				fl.Flush()
-			}
+			// only propagate flush if the headers have been flushed already.
+			// ResponseController is used instead of an http.Flusher type
+			// assertion because caddy wraps the response writer in types that
+			// only expose the flusher further down the Unwrap chain.
+			//nolint:bodyclose
+			_ = http.NewResponseController(i.w).Flush()
 		}
 
 	}
@@ -287,7 +305,7 @@ func wrap(w http.ResponseWriter, r *http.Request, tx types.Transaction) (
 	}
 
 	var (
-		hijacker, isHijacker = i.w.(http.Hijacker)
+		hijacker, isHijacker = hijackerOf(i.w)
 		pusher, isPusher     = i.w.(http.Pusher)
 	)
 

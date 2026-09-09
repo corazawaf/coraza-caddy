@@ -168,6 +168,15 @@ func (hijackerPusherResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error
 
 func (hijackerPusherResponseWriter) Push(string, *http.PushOptions) error { return nil }
 
+// unwrapOnlyResponseWriter mimics caddy's ResponseWriterWrapper: it exposes
+// neither Flush nor Hijack itself, only the writer behind Unwrap does.
+type unwrapOnlyResponseWriter struct{ inner http.ResponseWriter }
+
+func (w unwrapOnlyResponseWriter) Header() http.Header         { return w.inner.Header() }
+func (w unwrapOnlyResponseWriter) Write(b []byte) (int, error) { return w.inner.Write(b) }
+func (w unwrapOnlyResponseWriter) WriteHeader(statusCode int)  { w.inner.WriteHeader(statusCode) }
+func (w unwrapOnlyResponseWriter) Unwrap() http.ResponseWriter { return w.inner }
+
 func TestWrapPreservesInterfaces(t *testing.T) {
 	req, _ := http.NewRequest("GET", "/", nil)
 	rec := httptest.NewRecorder()
@@ -182,6 +191,7 @@ func TestWrapPreservesInterfaces(t *testing.T) {
 		{"hijacker writer", hijackerResponseWriter{rec}, true, false},
 		{"pusher writer", pusherResponseWriter{rec}, false, true},
 		{"hijacker+pusher writer", hijackerPusherResponseWriter{rec}, true, true},
+		{"hijacker behind unwrap", unwrapOnlyResponseWriter{hijackerResponseWriter{rec}}, true, false},
 	}
 
 	for _, tt := range tests {
@@ -423,6 +433,25 @@ func TestFlushDelegatesToUnderlyingFlusher(t *testing.T) {
 
 	require.True(t, i.isWriteHeaderFlush, "status code should have been flushed")
 	require.True(t, rec.Flushed, "underlying http.Flusher should have been called")
+}
+
+func TestFlushDelegatesThroughUnwrap(t *testing.T) {
+	waf := newWAF(t, `
+		SecRuleEngine On
+		SecResponseBodyAccess Off
+	`)
+	tx := waf.NewTransaction()
+	defer tx.Close()
+
+	rec := httptest.NewRecorder()
+	i := &rwInterceptor{w: unwrapOnlyResponseWriter{rec}, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+	i.WriteHeader(http.StatusOK)
+	// Write triggers flushWriteHeader for the non-buffered path
+	_, _ = i.Write([]byte("data"))
+	i.Flush()
+
+	require.True(t, rec.Flushed, "flusher behind Unwrap should have been called")
 }
 
 // TestConcurrentStreamingResponseFlush uses real HTTP connections to verify
