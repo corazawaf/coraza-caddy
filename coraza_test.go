@@ -754,6 +754,11 @@ func TestWAFViolationLogClientIP(t *testing.T) {
 			expectedClientIP: "1.2.3.4",
 		},
 		{
+			name:             "IPv6 from RemoteAddr",
+			remoteAddr:       "[2001:db8::1]:1234",
+			expectedClientIP: "2001:db8::1",
+		},
+		{
 			name:             "from Caddy variable",
 			remoteAddr:       "127.0.0.1:1234",
 			clientIPVar:      "5.6.7.8:5678",
