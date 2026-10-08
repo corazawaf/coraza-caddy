@@ -130,6 +130,47 @@ Adding `load_owasp_crs` to the `coraza_waf` block resolves it.
 }
 ```
 
+## Using Coraza plugins
+
+Coraza plugins (extra operators, body processors, GeoIP lookups) are plain Go
+packages that register themselves in `init()`. xcaddy adds a blank import for
+every `--with` package, so a plugin that needs no configuration can be added
+straight to the build:
+
+```shell
+xcaddy build --with github.com/corazawaf/coraza-caddy/v2 \
+  --with github.com/some/coraza-plugin
+```
+
+A plugin that needs setup, such as
+[coraza-geoip](https://github.com/corazawaf/coraza-geoip) which must be given a
+database, needs a small package of your own that does the registration. Pass it
+to xcaddy as a local module:
+
+```go
+// register/register.go
+package register
+
+import (
+	_ "embed"
+
+	geo "github.com/corazawaf/coraza-geoip"
+)
+
+//go:embed GeoLite2-Country.mmdb
+var db []byte
+
+func init() {
+	geo.RegisterGeoDatabase(db, "country")
+}
+```
+
+```shell
+# register/go.mod declares `module example.com/register` and requires coraza-geoip
+xcaddy build --with github.com/corazawaf/coraza-caddy/v2 \
+  --with example.com/register=./register
+```
+
 ## Specifying transaction ID from downstream
 
 You can specify the transaction ID by setting the field `tx_id_req_header` and then pass the value for that request header.
