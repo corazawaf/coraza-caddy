@@ -896,6 +896,67 @@ func TestIsValidTxID(t *testing.T) {
 	}
 }
 
+// TestViolationLogResponsePhase verifies that an interruption raised while
+// processing the response (phase 3/4) also produces the "WAF rule violation
+// detected" entry. Before the fix only request-phase interruptions were logged.
+func TestViolationLogResponsePhase(t *testing.T) {
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprint(w, "leak: SQL Error")
+	}))
+	t.Cleanup(origin.Close)
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	caddyPort := ln.Addr().(*net.TCPAddr).Port
+	ln.Close()
+
+	logFile := filepath.Join(t.TempDir(), "caddy.log")
+	tester := caddytest.NewTester(t)
+	tester.InitServer(fmt.Sprintf(`{
+		admin localhost:%d
+		auto_https off
+		order coraza_waf first
+		log {
+			output file %s
+			format json
+		}
+	}
+	:%d {
+		coraza_waf {
+			directives `+"`"+`
+				SecRuleEngine On
+				SecResponseBodyAccess On
+				SecResponseBodyMimeType text/plain
+				SecRule RESPONSE_BODY "SQL Error" "id:9407,phase:4,deny,status:403,log"
+			`+"`"+`
+		}
+		reverse_proxy %s
+	}`, caddytest.Default.AdminPort, logFile, caddyPort, origin.Listener.Addr().String()), "caddyfile")
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://127.0.0.1:%d/leaky", caddyPort), nil)
+	require.NoError(t, err)
+	tester.AssertResponseCode(req, 403)
+
+	var entry map[string]any
+	require.Eventually(t, func() bool {
+		data, err := os.ReadFile(logFile)
+		if err != nil {
+			return false
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.Contains(line, "WAF rule violation detected") && json.Unmarshal([]byte(line), &entry) == nil {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 100*time.Millisecond, "violation log entry not found for a phase 4 interruption")
+
+	require.Equal(t, "/leaky", entry["uri"])
+	require.Equal(t, float64(9407), entry["rule_id"])
+	require.Equal(t, "deny", entry["action"])
+}
+
 // TestViolationLogClientIPFromXFF verifies that the "WAF rule violation
 // detected" error log carries the client IP resolved by PrepareRequest
 // (trusted proxy + X-Forwarded-For), not r.RemoteAddr. Regression test for

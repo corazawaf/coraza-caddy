@@ -237,15 +237,7 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 			Err:        err,
 		}
 	} else if it != nil {
-		client, _ := getClientAddress(r)
-		m.logger.Error("WAF rule violation detected",
-			zap.String("hostname", r.Host),
-			zap.String("uri", r.RequestURI),
-			zap.String("client_ip", client),
-			zap.String("unique_id", tx.ID()),
-			zap.Int("rule_id", it.RuleID),
-			zap.String("action", it.Action),
-		)
+		m.logViolation(r, tx, it)
 		return caddyhttp.HandlerError{
 			StatusCode: obtainStatusCodeFromInterruptionOrDefault(it, http.StatusOK),
 			ID:         tx.ID(),
@@ -256,11 +248,29 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 	ww, processResponse := wrap(w, r, tx)
 
 	// We continue with the other middlewares by catching the response
-	if err := next.ServeHTTP(ww, r); err != nil {
-		return err
+	err := next.ServeHTTP(ww, r)
+	if err == nil {
+		err = processResponse(tx, r)
 	}
+	// The request phases did not interrupt, so any interruption now comes from
+	// the response phases (3/4). The interceptor already sent the status code;
+	// here we only make sure it is logged like a request-phase block.
+	if it := tx.Interruption(); it != nil {
+		m.logViolation(r, tx, it)
+	}
+	return err
+}
 
-	return processResponse(tx, r)
+func (m corazaModule) logViolation(r *http.Request, tx types.Transaction, it *types.Interruption) {
+	client, _ := getClientAddress(r)
+	m.logger.Error("WAF rule violation detected",
+		zap.String("hostname", r.Host),
+		zap.String("uri", r.RequestURI),
+		zap.String("client_ip", client),
+		zap.String("unique_id", tx.ID()),
+		zap.Int("rule_id", it.RuleID),
+		zap.String("action", it.Action),
+	)
 }
 
 // Unmarshal Caddyfile implements caddyfile.Unmarshaler.

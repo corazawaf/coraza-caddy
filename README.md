@@ -242,4 +242,5 @@ handle_errors {
 ```
 
 The `WAF rule violation detected` log entry carries the same information in
-the `rule_id` and `action` fields.
+the `rule_id` and `action` fields, for blocks raised in the request phases and
+in the response phases alike.
