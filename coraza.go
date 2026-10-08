@@ -5,7 +5,6 @@ package coraza
 
 import (
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -170,7 +169,12 @@ func (m *corazaModule) Cleanup() error {
 	return err
 }
 
-var errInterruptionTriggered = errors.New("interruption triggered")
+// interruptionError describes a WAF interruption. Caddy exposes the message as
+// {http.error.message}, so error handlers can tell WAF blocks apart from
+// application errors and see which rule fired.
+func interruptionError(it *types.Interruption) error {
+	return fmt.Errorf("interruption triggered by rule %d (%s)", it.RuleID, it.Action)
+}
 
 // isValidTxID reports whether s is acceptable as a transaction ID supplied by
 // an upstream proxy. Coraza's concurrent audit log writer interpolates the
@@ -239,11 +243,13 @@ func (m corazaModule) ServeHTTP(w http.ResponseWriter, r *http.Request, next cad
 			zap.String("uri", r.RequestURI),
 			zap.String("client_ip", client),
 			zap.String("unique_id", tx.ID()),
+			zap.Int("rule_id", it.RuleID),
+			zap.String("action", it.Action),
 		)
 		return caddyhttp.HandlerError{
 			StatusCode: obtainStatusCodeFromInterruptionOrDefault(it, http.StatusOK),
 			ID:         tx.ID(),
-			Err:        errInterruptionTriggered,
+			Err:        interruptionError(it),
 		}
 	}
 

@@ -228,3 +228,18 @@ handle_errors {
 ```
 
 It is possible to use the [templates](https://caddyserver.com/docs/caddyfile/directives/templates) directive to render data dynamically. Take a look at [`example/403.html`](./example/403.html) file.  
+
+When the WAF blocks a request, `{http.error.message}` is
+`interruption triggered by rule <id> (<action>)`. Use it to tell WAF blocks
+apart from application errors with the same status code, or to show the rule
+ID on the error page:
+
+```caddy
+handle_errors {
+ @waf expression `{http.error.message}.startsWith("interruption triggered")`
+ respond @waf "Blocked by the WAF: {http.error.message}" 403
+}
+```
+
+The `WAF rule violation detected` log entry carries the same information in
+the `rule_id` and `action` fields.

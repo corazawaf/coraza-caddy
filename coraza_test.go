@@ -937,6 +937,9 @@ func TestViolationLogClientIPFromXFF(t *testing.T) {
 			SecRule REQUEST_URI "@streq /denyme" "id:9306,phase:1,deny,status:403,log,msg:'client_ip log test'"`+"`"+`
 		}
 		respond "ok"
+		handle_errors {
+			respond "{http.error.message}" 403
+		}
 	}`, caddyAdminPort, logFile, caddyPort)
 
 	tester.InitServer(config, "caddyfile")
@@ -945,7 +948,8 @@ func TestViolationLogClientIPFromXFF(t *testing.T) {
 	req, err := http.NewRequest("GET", fmt.Sprintf("http://127.0.0.1:%d/denyme", caddyPort), nil)
 	require.NoError(t, err)
 	req.Header.Set("X-Forwarded-For", forwardedIP)
-	tester.AssertResponseCode(req, 403)
+	// {http.error.message} must identify the rule so error handlers can act on it.
+	tester.AssertResponse(req, 403, "interruption triggered by rule 9306 (deny)")
 
 	// The log write is asynchronous; poll for the violation entry.
 	var entry map[string]any
@@ -968,4 +972,6 @@ func TestViolationLogClientIPFromXFF(t *testing.T) {
 	require.Equal(t, forwardedIP, entry["client_ip"],
 		"violation log must carry the XFF-resolved client IP, not the proxy RemoteAddr")
 	require.Equal(t, "/denyme", entry["uri"])
+	require.Equal(t, float64(9306), entry["rule_id"])
+	require.Equal(t, "deny", entry["action"])
 }
