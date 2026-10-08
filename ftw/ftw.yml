@@ -41,3 +41,16 @@ testoverride:
     933220-2: 'Header name with underscore (X_Filename) is dropped by Caddy, so the rule never fires'
     944140-3: 'Header name with underscore (X_Filename) is dropped by Caddy, so the rule never fires'
     944140-8: 'Header name with underscore (X_Filename) is dropped by Caddy, so the rule never fires'
+
+    # Tests sending an X.Filename header: Caddy >= 2.11.6 drops header names
+    # containing a dot (GHSA-49wc-4hcv-v58q). Allowlisting it via
+    # expected_dot_headers would in turn drop the hyphenated X-Filename, which
+    # the other 933110/933220 tests rely on, so these are ignored instead.
+    933110-20: 'Header name with dot (X.Filename) is dropped by Caddy, so the rule never fires'
+    933110-21: 'Header name with dot (X.Filename) is dropped by Caddy, so the rule never fires'
+    933110-22: 'Header name with dot (X.Filename) is dropped by Caddy, so the rule never fires'
+    933110-24: 'Header name with dot (X.Filename) is dropped by Caddy, so the rule never fires'
+    933110-25: 'Header name with dot (X.Filename) is dropped by Caddy, so the rule never fires'
+    933110-26: 'Header name with dot (X.Filename) is dropped by Caddy, so the rule never fires'
+    933110-27: 'Header name with dot (X.Filename) is dropped by Caddy, so the rule never fires'
+    933220-4: 'Header name with dot (X.Filename) is dropped by Caddy, so the rule never fires'
