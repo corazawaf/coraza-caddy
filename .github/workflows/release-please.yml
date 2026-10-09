@@ -54,7 +54,7 @@ jobs:
       # happen via read-only GitHub API calls, no PR or tag is ever created,
       # so it runs on the default GITHUB_TOKEN instead of the write-scoped App
       # token above.
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # ratchet:actions/setup-node@v6.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         if: inputs.dry-run == true
         with:
           node-version: "22"
