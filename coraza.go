@@ -16,7 +16,8 @@ import (
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
-	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
+	corazaconf "github.com/corazawaf/coraza-coreruleset/coraza/v3"
+	coreruleset "github.com/corazawaf/coraza-coreruleset/crs/v4"
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/jcchavezs/mergefs"
@@ -105,7 +106,7 @@ func (m *corazaModule) buildWAF() (coraza.WAF, error) {
 		WithDebugLogger(newLogger(m.logger))
 
 	if m.LoadOWASPCRS {
-		config = config.WithRootFS(mergefs.Merge(coreruleset.FS, mergefsio.OSFS))
+		config = config.WithRootFS(mergefs.Merge(coreruleset.FS, corazaconf.FS, mergefsio.OSFS))
 	}
 
 	if m.Directives != "" {

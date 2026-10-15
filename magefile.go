@@ -103,7 +103,7 @@ func Ftw() error {
 	CRSVersion := os.Getenv("CRS_VERSION")
 	if CRSVersion == "" {
 		var err error
-		CRSVersion, err = getModuleVersion("github.com/corazawaf/coraza-coreruleset/v4")
+		CRSVersion, err = getModuleVersion("github.com/corazawaf/coraza-coreruleset/crs/v4")
 		if err != nil {
 			return fmt.Errorf("cannot get coraza-coreruleset module version: %s", err)
 		}
