@@ -59,6 +59,27 @@ coraza_waf {
 
 The same error appears if an `@` path is prefixed with a directory, as in `Include /etc/caddy/rules/@owasp_crs/*.conf`. The `@` must start the path.
 
+### `SecDefaultAction already defined for this phase`
+Since v2.7.0 the embedded CRS is v4.30.0, whose `@crs-setup.conf.example` declares `SecDefaultAction` for phases 1 to 5. Coraza allows one per phase, so a config that sets its own after the include fails at startup:
+
+```text
+invalid WAF config from string: failed to parse string: failed to compile the directive "secaction":
+  SecDefaultAction already defined for this phase: phase:3,log,auditlog,pass
+```
+
+If the lines were added so that response-phase (3 and 4) blocks get logged, delete them: the setup file now provides them. To keep custom defaults, include `@crs-setup.conf.example-nodefaultact` instead, which is the same file with its `SecDefaultAction` lines commented out:
+
+```caddy
+Include @coraza.conf-recommended
+Include @crs-setup.conf.example-nodefaultact
+SecDefaultAction "phase:1,log,auditlog,pass"
+SecDefaultAction "phase:2,log,auditlog,pass"
+SecDefaultAction "phase:3,log,auditlog,pass"
+SecDefaultAction "phase:4,log,auditlog,pass"
+SecDefaultAction "phase:5,log,auditlog,pass"
+Include @owasp_crs/*.conf
+```
+
 ### Debug log file is created but stays empty
 `SecDebugLogLevel` on its own is not enough. Coraza's debug output is routed through Caddy's logger, and Coraza's debug and trace levels are both emitted at Caddy's `DEBUG` level. Caddy logs at `INFO` by default, so the entries are filtered out before they reach the file.
 
