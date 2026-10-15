@@ -21,9 +21,6 @@
 		directives `
 		Include @coraza.conf-recommended
 		# FTW config
-		SecDefaultAction "phase:3,log,auditlog,pass"
-		SecDefaultAction "phase:4,log,auditlog,pass"
-		SecDefaultAction "phase:5,log,auditlog,pass"
 		SecDebugLogLevel 3
 
 		SecAction "id:900005,\
