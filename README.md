@@ -133,9 +133,9 @@ Adding `load_owasp_crs` to the `coraza_waf` block resolves it.
 ## Using Coraza plugins
 
 Coraza plugins (extra operators, body processors, GeoIP lookups) are plain Go
-packages that register themselves in `init()`. xcaddy adds a blank import for
-every `--with` package, so a plugin that needs no configuration can be added
-straight to the build:
+packages that register with Coraza from an `init()`. xcaddy adds a blank import
+for every `--with` package, so a plugin that registers itself and needs no
+configuration can be added straight to the build:
 
 ```shell
 xcaddy build --with github.com/corazawaf/coraza-caddy/v2 \
@@ -153,6 +153,7 @@ package register
 
 import (
 	_ "embed"
+	"fmt"
 
 	geo "github.com/corazawaf/coraza-geoip"
 )
@@ -161,7 +162,9 @@ import (
 var db []byte
 
 func init() {
-	geo.RegisterGeoDatabase(db, "country")
+	if err := geo.RegisterGeoDatabase(db, "country"); err != nil {
+		panic(fmt.Errorf("registering GeoIP database: %w", err))
+	}
 }
 ```
 
