@@ -69,6 +69,18 @@ func (i *rwInterceptor) WriteHeader(statusCode int) {
 		return
 	}
 
+	// Informational responses (1xx) are not the final status. Pass them
+	// straight to the client and wait for the real status that follows.
+	// Recording e.g. a 103 Early Hints as the final status holds the hints
+	// back until the whole response is ready, and the later WriteHeader
+	// with the real status is then ignored, so net/http sends an implicit
+	// 200 instead. 101 Switching Protocols is a final status and keeps the
+	// handling below.
+	if statusCode >= 100 && statusCode < 200 && statusCode != http.StatusSwitchingProtocols {
+		i.w.WriteHeader(statusCode)
+		return
+	}
+
 	for k, vv := range i.w.Header() {
 		for _, v := range vv {
 			i.tx.AddResponseHeader(k, v)
