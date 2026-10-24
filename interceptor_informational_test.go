@@ -18,10 +18,10 @@ import (
 
 const earlyHintsDelay = time.Second
 
-// earlyHintsThroughInterceptor serves one response through the WAF's
-// interceptor: a 103, a pause, then final. It returns how long the 103
-// took to arrive and the final status the client saw.
-func earlyHintsThroughInterceptor(t *testing.T, final int) (time.Duration, int) {
+// earlyHintsThroughInterceptor serves one response through the interceptor:
+// a 103, a pause, then final. It returns how long the 103 took to arrive and
+// the final status the client saw. ctx bounds the request and the pause.
+func earlyHintsThroughInterceptor(ctx context.Context, t *testing.T, final int) (time.Duration, int) {
 	t.Helper()
 	tx := newTestTransaction(t)
 	defer tx.Close()
@@ -30,7 +30,14 @@ func earlyHintsThroughInterceptor(t *testing.T, final int) (time.Duration, int) 
 		ww, processResponse := wrap(w, r, tx)
 		ww.Header().Set("Link", "</style.css>; rel=preload; as=style")
 		ww.WriteHeader(http.StatusEarlyHints)
-		time.Sleep(earlyHintsDelay)
+		timer := time.NewTimer(earlyHintsDelay)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-r.Context().Done():
+			handlerErr <- r.Context().Err()
+			return
+		}
 		ww.WriteHeader(final)
 		_, _ = ww.Write([]byte("body"))
 		handlerErr <- processResponse(tx, r)
@@ -45,26 +52,38 @@ func earlyHintsThroughInterceptor(t *testing.T, final int) (time.Duration, int) 
 		}
 		return nil
 	}}
-	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(context.Background(), trace), http.MethodGet, srv.URL, nil)
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(ctx, trace), http.MethodGet, srv.URL, nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	_, _ = io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
-	require.NoError(t, <-handlerErr)
+	select {
+	case err := <-handlerErr:
+		require.NoError(t, err)
+	case <-ctx.Done():
+		t.Fatal("the handler did not finish in time")
+	}
 	return hint, resp.StatusCode
 }
 
-func TestEarlyHintsPassStraightThrough(t *testing.T) {
-	hint, status := earlyHintsThroughInterceptor(t, http.StatusOK)
-	require.NotZero(t, hint, "the 103 never reached the client")
-	require.Less(t, hint, earlyHintsDelay/2, "the 103 was held until the final response")
-	require.Equal(t, http.StatusOK, status)
-}
-
-func TestTheFinalStatusAfterEarlyHintsIsKept(t *testing.T) {
-	for _, final := range []int{http.StatusForbidden, http.StatusNotFound, http.StatusFound, http.StatusInternalServerError} {
-		_, status := earlyHintsThroughInterceptor(t, final)
-		require.Equal(t, final, status, "a %d sent after Early Hints reached the client as %d", final, status)
+// An informational response is passed straight to the client, and the
+// final status that follows it is kept.
+func TestEarlyHintsKeepTheFinalStatus(t *testing.T) {
+	for _, final := range []int{
+		http.StatusOK,
+		http.StatusFound,
+		http.StatusForbidden,
+		http.StatusNotFound,
+		http.StatusInternalServerError,
+	} {
+		t.Run(http.StatusText(final), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*earlyHintsDelay)
+			defer cancel()
+			hint, status := earlyHintsThroughInterceptor(ctx, t, final)
+			require.NotZero(t, hint, "the 103 never reached the client")
+			require.Less(t, hint, earlyHintsDelay/2, "the 103 was held until the final response")
+			require.Equal(t, final, status, "a %d sent after Early Hints reached the client as %d", final, status)
+		})
 	}
 }
