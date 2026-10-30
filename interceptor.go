@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/caddyserver/caddy/v2/modules/caddyhttp"
 	"github.com/corazawaf/coraza/v3/types"
@@ -63,7 +64,9 @@ type rwInterceptor struct {
 }
 
 // WriteHeader records the status code to be sent right before the moment
-// the body is being written.
+// the body is being written. Informational responses (1xx) are the
+// exception: they are not the final status and are written immediately,
+// see writeInformational.
 func (i *rwInterceptor) WriteHeader(statusCode int) {
 	if i.wroteHeader {
 		return
@@ -77,9 +80,14 @@ func (i *rwInterceptor) WriteHeader(statusCode int) {
 	// 200 instead. 101 Switching Protocols is a final status and keeps the
 	// handling below.
 	if statusCode >= 100 && statusCode < 200 && statusCode != http.StatusSwitchingProtocols {
-		i.w.WriteHeader(statusCode)
+		i.writeInformational(statusCode)
 		return
 	}
+
+	// Set before the response is processed: an interruption below returns
+	// early, and a later Flush must not write the headers again or run the
+	// response headers phase a second time on an interrupted transaction.
+	i.wroteHeader = true
 
 	for k, vv := range i.w.Header() {
 		for _, v := range vv {
@@ -104,11 +112,41 @@ func (i *rwInterceptor) WriteHeader(statusCode int) {
 		i.flushWriteHeader()
 	}
 
-	i.wroteHeader = true
 	if !i.tx.IsResponseBodyAccessible() || !i.tx.IsResponseBodyProcessable() {
 		// if the response body isn't accessible or processable we can already allow flushing
 		// we need to set this flag before the first call to Flush()
 		i.allowFlushing = true
+	}
+}
+
+// writeInformational sends a 1xx response to the client right away.
+//
+// The response headers phase has not seen these headers, so only Link, the
+// header Early Hints (RFC 8297) exist for, is sent. Everything else is set
+// aside for the call and put back afterwards, to go through the response
+// headers phase with the final status like any other response header. The
+// Link values themselves are not inspected before they are sent.
+// Nothing is sent once the transaction is interrupted or the final status
+// has been written.
+func (i *rwInterceptor) writeInformational(statusCode int) {
+	if i.tx.IsInterrupted() || i.isWriteHeaderFlush {
+		return
+	}
+
+	h := i.w.Header()
+	var held http.Header
+	for k, vv := range h {
+		if !strings.EqualFold(k, "Link") {
+			if held == nil {
+				held = make(http.Header)
+			}
+			held[k] = vv
+			delete(h, k)
+		}
+	}
+	i.w.WriteHeader(statusCode)
+	for k, vv := range held {
+		h[k] = vv
 	}
 }
 

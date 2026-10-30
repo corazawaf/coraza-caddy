@@ -5,13 +5,17 @@ package coraza
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httptrace"
+	"net/textproto"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -879,4 +883,253 @@ func TestRegularRequestStillProcessesResponseBody(t *testing.T) {
 	err = processResponse(tx, r)
 	// The rule should have triggered and returned an error
 	require.Error(t, err, "response body rule should still trigger for non-WebSocket requests")
+}
+
+// hintedResponse is what a client saw of a response that began with an
+// informational (1xx) response.
+type hintedResponse struct {
+	hint    textproto.MIMEHeader // the first 103, nil if none arrived
+	held    bool                 // the handler gave up waiting for the 103
+	status  int
+	header  http.Header
+	body    string
+	procErr error
+}
+
+// serveWithEarlyHints serves one response through the interceptor. serve
+// writes to the intercepted writer and calls awaitHint where the client
+// must already have received the 103: it blocks until the client has it, so
+// the test does not depend on timing, and it records held if the 103 never
+// arrives within ctx.
+func serveWithEarlyHints(t *testing.T, tx types.Transaction, serve func(ww http.ResponseWriter, awaitHint func())) hintedResponse {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	hints := make(chan textproto.MIMEHeader, 4)
+	hinted := make(chan struct{})
+	var once sync.Once
+	var held atomic.Bool
+	procErr := make(chan error, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ww, processResponse := wrap(w, r, tx)
+		serve(ww, func() {
+			select {
+			case <-hinted:
+			case <-ctx.Done():
+				held.Store(true)
+			}
+		})
+		procErr <- processResponse(tx, r)
+	}))
+	defer srv.Close()
+
+	trace := &httptrace.ClientTrace{Got1xxResponse: func(code int, h textproto.MIMEHeader) error {
+		if code == http.StatusEarlyHints {
+			hints <- h
+			once.Do(func() { close(hinted) })
+		}
+		return nil
+	}}
+	req, err := http.NewRequestWithContext(httptrace.WithClientTrace(ctx, trace), http.MethodGet, srv.URL, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	out := hintedResponse{status: resp.StatusCode, header: resp.Header, body: string(body)}
+	select {
+	case out.procErr = <-procErr:
+	case <-ctx.Done():
+		t.Fatal("the handler did not finish in time")
+	}
+	select {
+	case out.hint = <-hints:
+	default:
+	}
+	out.held = held.Load()
+	return out
+}
+
+// An informational response is passed straight to the client, and the
+// final status that follows it is kept.
+func TestEarlyHintsKeepTheFinalStatus(t *testing.T) {
+	for _, final := range []int{
+		http.StatusOK,
+		http.StatusFound,
+		http.StatusForbidden,
+		http.StatusNotFound,
+		http.StatusInternalServerError,
+	} {
+		t.Run(http.StatusText(final), func(t *testing.T) {
+			tx := newTestTransaction(t)
+			defer tx.Close()
+			got := serveWithEarlyHints(t, tx, func(ww http.ResponseWriter, awaitHint func()) {
+				ww.Header().Set("Link", "</style.css>; rel=preload; as=style")
+				ww.WriteHeader(http.StatusEarlyHints)
+				awaitHint()
+				ww.WriteHeader(final)
+				_, _ = ww.Write([]byte("body"))
+			})
+			require.False(t, got.held, "the 103 was held until the final response")
+			require.NotNil(t, got.hint, "the 103 never reached the client")
+			require.NoError(t, got.procErr)
+			require.Equal(t, final, got.status, "a %d sent after Early Hints reached the client as %d", final, got.status)
+		})
+	}
+}
+
+// The response headers phase has not seen the headers when a 103 is sent,
+// so only Link goes out with it. The rest still go with the final response.
+func TestEarlyHintsOnlySendLink(t *testing.T) {
+	tx := newTestTransaction(t)
+	defer tx.Close()
+	got := serveWithEarlyHints(t, tx, func(ww http.ResponseWriter, awaitHint func()) {
+		ww.Header().Set("Link", "</style.css>; rel=preload; as=style")
+		ww.Header().Set("Set-Cookie", "session=secret")
+		ww.Header().Set("X-Debug", "internal")
+		ww.WriteHeader(http.StatusEarlyHints)
+		awaitHint()
+		ww.WriteHeader(http.StatusOK)
+		_, _ = ww.Write([]byte("body"))
+	})
+	require.False(t, got.held)
+	require.NotNil(t, got.hint, "the 103 never reached the client")
+	require.Equal(t, []string{"</style.css>; rel=preload; as=style"}, got.hint["Link"])
+	require.Len(t, got.hint, 1, "the 103 carried more than Link: %v", got.hint)
+	require.Equal(t, "session=secret", got.header.Get("Set-Cookie"))
+	require.Equal(t, "internal", got.header.Get("X-Debug"))
+}
+
+// The response rules judge the final status, never a 1xx.
+func TestEarlyHintsStatusSeenByTheResponseRules(t *testing.T) {
+	const bodyAccess = "SecResponseBodyAccess On\nSecResponseBodyMimeType text/plain\n"
+	tests := map[string]struct {
+		directives string
+		final      int
+		wantStatus int
+		wantBody   string
+	}{
+		"a rule on 103 never fires": {
+			directives: `SecRule RESPONSE_STATUS "@streq 103" "id:1,phase:3,deny,status:500"`,
+			final:      http.StatusOK,
+			wantStatus: http.StatusOK,
+			wantBody:   "ok",
+		},
+		"a rule on the final status fires": {
+			directives: `SecRule RESPONSE_STATUS "@streq 404" "id:1,phase:3,deny,status:418"`,
+			final:      http.StatusNotFound,
+			wantStatus: http.StatusTeapot,
+		},
+		"final status held for the body, rule on 103 never fires": {
+			directives: bodyAccess + `SecRule RESPONSE_STATUS "@streq 103" "id:1,phase:3,deny,status:500"`,
+			final:      http.StatusOK,
+			wantStatus: http.StatusOK,
+			wantBody:   "ok",
+		},
+		"final status held for the body, rule on it fires": {
+			directives: bodyAccess + `SecRule RESPONSE_STATUS "@streq 404" "id:1,phase:3,deny,status:418"`,
+			final:      http.StatusNotFound,
+			wantStatus: http.StatusTeapot,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			tx := newWAF(t, "SecRuleEngine On\n"+tc.directives).NewTransaction()
+			defer tx.Close()
+			got := serveWithEarlyHints(t, tx, func(ww http.ResponseWriter, awaitHint func()) {
+				ww.Header().Set("Link", "</style.css>; rel=preload; as=style")
+				ww.Header().Set("Content-Type", "text/plain")
+				ww.WriteHeader(http.StatusEarlyHints)
+				awaitHint()
+				ww.WriteHeader(tc.final)
+				_, _ = ww.Write([]byte("ok"))
+			})
+			require.False(t, got.held)
+			require.NoError(t, got.procErr)
+			require.Equal(t, tc.wantStatus, got.status)
+			require.Equal(t, tc.wantBody, got.body)
+		})
+	}
+}
+
+// statusLog records every status code that reaches the delegate writer.
+type statusLog struct {
+	http.ResponseWriter
+	codes []int
+}
+
+func (s *statusLog) WriteHeader(code int) {
+	s.codes = append(s.codes, code)
+	s.ResponseWriter.WriteHeader(code)
+}
+
+// Once the transaction is interrupted nothing more reaches the client: not a
+// late 1xx, and not a Flush that writes the headers a second time.
+func TestNothingReachesTheClientAfterAnInterruption(t *testing.T) {
+	waf := newWAF(t, `SecRuleEngine On
+SecRule RESPONSE_STATUS "@streq 404" "id:1,phase:3,deny,status:418"`)
+	tx := waf.NewTransaction()
+	defer tx.Close()
+
+	log := &statusLog{ResponseWriter: httptest.NewRecorder()}
+	i := &rwInterceptor{w: log, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+
+	i.WriteHeader(http.StatusNotFound)
+	require.True(t, tx.IsInterrupted())
+	require.Equal(t, []int{http.StatusTeapot}, log.codes)
+	// set even though the response was interrupted, so that nothing after
+	// this runs the response headers phase again
+	require.True(t, i.wroteHeader)
+
+	i.WriteHeader(http.StatusEarlyHints)
+	i.Flush()
+	require.Equal(t, []int{http.StatusTeapot}, log.codes)
+}
+
+// A 1xx is not sent when the transaction was interrupted before the response
+// began (here at the request headers phase), nor once the final status has
+// been flushed.
+func TestEarlyHintsNotSentWhenNothingMayBeSent(t *testing.T) {
+	t.Run("interrupted before the response", func(t *testing.T) {
+		waf := newWAF(t, `SecRuleEngine On
+SecRule REQUEST_URI "@rx ." "id:2,phase:1,deny,status:403"`)
+		tx := waf.NewTransaction()
+		defer tx.Close()
+		tx.ProcessURI("/", http.MethodGet, "HTTP/1.1")
+		require.NotNil(t, tx.ProcessRequestHeaders())
+
+		log := &statusLog{ResponseWriter: httptest.NewRecorder()}
+		i := &rwInterceptor{w: log, tx: tx, proto: "HTTP/1.1", statusCode: 200}
+		i.WriteHeader(http.StatusEarlyHints)
+		require.Empty(t, log.codes)
+	})
+	t.Run("final status already flushed", func(t *testing.T) {
+		tx := newTestTransaction(t)
+		defer tx.Close()
+
+		log := &statusLog{ResponseWriter: httptest.NewRecorder()}
+		i := &rwInterceptor{w: log, tx: tx, proto: "HTTP/1.1", statusCode: 200, isWriteHeaderFlush: true}
+		i.WriteHeader(http.StatusEarlyHints)
+		require.Empty(t, log.codes)
+	})
+}
+
+// A Flush between a 1xx and the final status commits a 200, as net/http does
+// for a Flush before any WriteHeader. A handler that wants another status
+// sets it before it flushes.
+func TestFlushAfterEarlyHintsCommitsOK(t *testing.T) {
+	tx := newTestTransaction(t)
+	defer tx.Close()
+	got := serveWithEarlyHints(t, tx, func(ww http.ResponseWriter, awaitHint func()) {
+		ww.Header().Set("Link", "</style.css>; rel=preload; as=style")
+		ww.WriteHeader(http.StatusEarlyHints)
+		awaitHint()
+		ww.(http.Flusher).Flush()
+		ww.WriteHeader(http.StatusForbidden)
+	})
+	require.False(t, got.held)
+	require.Equal(t, http.StatusOK, got.status)
 }
